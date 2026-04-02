@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { IDEAL_WEEKLY_BENCHMARKS, IDEAL_NAME, calcIdealLifeScore, PILLAR_WEIGHTS, getCatchUpPlan, getGapStatus } from '../lib/idealJoseph'
 import { scoreColor } from '../lib/utils'
 
@@ -12,9 +12,10 @@ const PILLARS = [
   { key: 'goals',    label: 'Goals',    icon: '🎯', color: '#22c55e' },
 ]
 
+// ─── Gap meter ────────────────────────────────────────────────────────────────
+
 function GapMeter({ actual, ideal, color }) {
   const gap = ideal - actual
-  const gapPct = Math.round((gap / ideal) * 100)
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text3)', marginBottom: 4 }}>
@@ -35,128 +36,228 @@ function GapMeter({ actual, ideal, color }) {
   )
 }
 
-function WeeklyComparison({ pillarScores }) {
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, marginBottom: 2 }}>
-      <div style={{ padding: '10px 16px', background: 'var(--bg3)', borderRadius: '8px 0 0 8px', fontSize: 13, fontWeight: 600, color: 'var(--accent2)', textAlign: 'center' }}>
-        YOU THIS WEEK
-      </div>
-      <div style={{ padding: '10px 16px', background: 'rgba(251,191,36,0.1)', borderRadius: '0 8px 8px 0', fontSize: 13, fontWeight: 600, color: '#fbbf24', textAlign: 'center' }}>
-        {IDEAL_NAME.toUpperCase()}
-      </div>
-    </div>
-  )
-}
+// ─── Weekly history chart ─────────────────────────────────────────────────────
 
-function WeeklyHistoryCalendar({ weeklyHistory = [], idealScore }) {
-  const [expandedWeek, setExpandedWeek] = useState(null)
+function WeeklyHistoryChart({ weeklyHistory = [], idealScore }) {
+  const [hoveredIdx, setHoveredIdx] = useState(null)
+
   if (!weeklyHistory || weeklyHistory.length === 0) return null
 
-  const sorted = [...weeklyHistory].sort((a, b) => b.week.localeCompare(a.week)) // newest first
+  // Chart dimensions
+  const BAR_W    = 32
+  const BAR_GAP  = 6
+  const HEIGHT   = 110
+  const IDEAL_Y  = Math.round((1 - idealScore / 100) * HEIGHT)
+
+  const maxScore = 100
+  const weeks = weeklyHistory
+
+  // Summary stats
+  const avg      = Math.round(weeks.reduce((s, w) => s + w.score, 0) / weeks.length)
+  const best     = Math.max(...weeks.map(w => w.score))
+  const trend    = weeks.length >= 2 ? weeks[weeks.length - 1].score - weeks[weeks.length - 2].score : 0
+  const beatIdeal = weeks.filter(w => w.score >= idealScore).length
+
+  function fmtWeek(weekStart) {
+    const d = new Date(weekStart + 'T12:00:00')
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  function barColor(score) {
+    if (score >= idealScore) return '#22c55e'
+    if (score >= idealScore - 15) return '#f59e0b'
+    return '#9f91ff'
+  }
+
+  const totalW = weeks.length * (BAR_W + BAR_GAP) - BAR_GAP
 
   return (
-    <div style={{ marginTop: 20 }}>
-      <div className="card" style={{ border: '1px solid rgba(251,191,36,0.15)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <div className="card-title" style={{ margin: 0 }}>📅 Past weeks — You vs {IDEAL_NAME}</div>
-          <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--text3)' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />≥ ideal
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />close
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />behind
+    <div className="card" style={{ marginTop: 20, border: '1px solid rgba(251,191,36,0.15)', overflow: 'hidden' }}>
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <div>
+          <div className="card-title" style={{ margin: 0, marginBottom: 2 }}>📈 Your journey vs {IDEAL_NAME}</div>
+          <div style={{ fontSize: 12, color: 'var(--text3)' }}>Weekly Life Score history — last {weeks.length} week{weeks.length !== 1 ? 's' : ''}</div>
+        </div>
+        {/* Summary pills */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div style={{ padding: '4px 10px', borderRadius: 20, background: 'var(--bg3)', border: '1px solid var(--border)', fontSize: 11 }}>
+            <span style={{ color: 'var(--text3)' }}>avg </span>
+            <span style={{ fontWeight: 700, color: scoreColor(avg) }}>{avg}</span>
+          </div>
+          <div style={{ padding: '4px 10px', borderRadius: 20, background: 'var(--bg3)', border: '1px solid var(--border)', fontSize: 11 }}>
+            <span style={{ color: 'var(--text3)' }}>best </span>
+            <span style={{ fontWeight: 700, color: '#22c55e' }}>{best}</span>
+          </div>
+          <div style={{ padding: '4px 10px', borderRadius: 20, background: 'var(--bg3)', border: '1px solid var(--border)', fontSize: 11 }}>
+            <span style={{ color: 'var(--text3)' }}>trend </span>
+            <span style={{ fontWeight: 700, color: trend >= 0 ? '#22c55e' : '#ef4444' }}>
+              {trend >= 0 ? '↑' : '↓'}{Math.abs(trend)}
             </span>
           </div>
+          {beatIdeal > 0 && (
+            <div style={{ padding: '4px 10px', borderRadius: 20, background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', fontSize: 11 }}>
+              <span style={{ color: '#fbbf24', fontWeight: 700 }}>★ {beatIdeal}× matched ideal</span>
+            </div>
+          )}
         </div>
+      </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {sorted.map(entry => {
-            const isOpen   = expandedWeek === entry.week
-            const yourScore = Math.round(entry.score)
-            const gap      = idealScore - yourScore
-            const dotColor = gap <= 0 ? '#22c55e' : gap <= 15 ? '#f59e0b' : '#ef4444'
-            const bgColor  = gap <= 0 ? 'rgba(34,197,94,0.08)' : gap <= 15 ? 'rgba(245,158,11,0.07)' : 'rgba(239,68,68,0.06)'
-            const borderColor = gap <= 0 ? 'rgba(34,197,94,0.25)' : gap <= 15 ? 'rgba(245,158,11,0.25)' : 'rgba(239,68,68,0.2)'
-            const pct = Math.round((yourScore / idealScore) * 100)
+      {/* Chart */}
+      <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
+        <div style={{ position: 'relative', minWidth: totalW + 40, height: HEIGHT + 52, paddingLeft: 28 }}>
 
-            // Format week label e.g. "Mar 24 – Mar 30"
-            const weekDate = new Date(entry.week + 'T12:00:00')
-            const endDate  = new Date(weekDate); endDate.setDate(endDate.getDate() + 6)
-            const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-            const weekLabel = `${fmt(weekDate)} – ${fmt(endDate)}`
-
+          {/* Y-axis labels */}
+          {[0, 25, 50, 75, 100].map(v => {
+            const y = Math.round((1 - v / 100) * HEIGHT)
             return (
-              <div key={entry.week} style={{ borderRadius: 8, overflow: 'hidden', border: `1px solid ${isOpen ? borderColor : 'var(--border)'}` }}>
-                {/* Row */}
-                <div
-                  onClick={() => setExpandedWeek(isOpen ? null : entry.week)}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', cursor: 'pointer', background: isOpen ? bgColor : 'var(--bg3)', gap: 10 }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>{weekLabel}</span>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    {/* Mini score comparison */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                      <span style={{ fontWeight: 700, color: dotColor }}>{yourScore}</span>
-                      <span style={{ color: 'var(--text3)' }}>vs</span>
-                      <span style={{ fontWeight: 700, color: '#fbbf24' }}>{idealScore}</span>
-                    </div>
-                    <span style={{ fontSize: 11, color: 'var(--text3)' }}>{isOpen ? '▲' : '▼'}</span>
-                  </div>
-                </div>
-
-                {/* Expanded detail */}
-                {isOpen && (
-                  <div style={{ padding: '14px 16px', background: 'var(--bg2)', borderTop: `1px solid ${borderColor}` }}>
-                    {/* Progress bar comparison */}
-                    <div style={{ marginBottom: 14 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text3)', marginBottom: 6 }}>
-                        <span>Your score</span>
-                        <span style={{ color: '#fbbf24' }}>Ideal Joseph target</span>
-                      </div>
-                      <div style={{ position: 'relative', height: 12, background: 'var(--bg4)', borderRadius: 6, overflow: 'visible' }}>
-                        <div style={{ height: '100%', borderRadius: 6, background: dotColor, width: `${Math.min(yourScore, 100)}%`, transition: 'width 0.4s ease' }} />
-                        <div style={{ position: 'absolute', top: -3, left: `${Math.min(idealScore, 100)}%`, width: 2, height: 18, background: '#fbbf24', borderRadius: 1 }} />
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontSize: 11 }}>
-                        <span style={{ color: dotColor, fontWeight: 700 }}>{yourScore} pts ({pct}% of ideal)</span>
-                        <span style={{ color: '#fbbf24', fontWeight: 600 }}>{idealScore} pts</span>
-                      </div>
-                    </div>
-
-                    {/* Gap summary */}
-                    <div style={{
-                      padding: '10px 12px', borderRadius: 8, fontSize: 13,
-                      background: gap <= 0 ? 'rgba(34,197,94,0.08)' : gap <= 15 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.07)',
-                      border: `1px solid ${borderColor}`,
-                      color: 'var(--text2)', lineHeight: 1.6,
-                    }}>
-                      {gap <= 0
-                        ? <span>✨ <strong>You matched or beat Ideal Joseph</strong> this week. This is what peak looks like.</span>
-                        : gap <= 10
-                        ? <span>🟡 <strong>{gap} pts behind</strong> — so close. One more focused day would have closed this gap.</span>
-                        : gap <= 25
-                        ? <span>🟠 <strong>{gap} pts behind</strong> — a solid week, but there's room. Identify your weakest pillar and attack it.</span>
-                        : <span>🔴 <strong>{gap} pts behind</strong> — tough week. Remember: one bad week doesn't define the journey. Reset and go again.</span>
-                      }
-                    </div>
-                  </div>
-                )}
+              <div key={v} style={{ position: 'absolute', left: 0, top: y - 6, fontSize: 9, color: 'var(--text3)', width: 22, textAlign: 'right', lineHeight: 1 }}>
+                {v}
               </div>
             )
           })}
+
+          {/* Grid lines */}
+          <svg style={{ position: 'absolute', left: 28, top: 0, width: totalW, height: HEIGHT, overflow: 'visible' }}>
+            {[0, 25, 50, 75, 100].map(v => {
+              const y = Math.round((1 - v / 100) * HEIGHT)
+              return (
+                <line key={v} x1={0} y1={y} x2={totalW} y2={y}
+                  stroke={v === 0 || v === 100 ? 'var(--border2)' : 'var(--border)'}
+                  strokeWidth={1} strokeDasharray={v === 0 || v === 100 ? 'none' : '3 4'}
+                />
+              )
+            })}
+
+            {/* Ideal Joseph line */}
+            <line x1={0} y1={IDEAL_Y} x2={totalW} y2={IDEAL_Y}
+              stroke="#fbbf24" strokeWidth={1.5} strokeDasharray="5 3" opacity={0.8}
+            />
+            {/* Ideal label */}
+            <text x={totalW + 4} y={IDEAL_Y + 4} fontSize={9} fill="#fbbf24" fontWeight={600}>
+              Ideal
+            </text>
+          </svg>
+
+          {/* Bars */}
+          <div style={{ position: 'absolute', left: 28, top: 0, display: 'flex', alignItems: 'flex-end', gap: BAR_GAP, height: HEIGHT }}>
+            {weeks.map((w, i) => {
+              const barH   = Math.max(4, Math.round((w.score / maxScore) * HEIGHT))
+              const color  = barColor(w.score)
+              const isHov  = hoveredIdx === i
+              const isLast = i === weeks.length - 1
+
+              return (
+                <div
+                  key={w.week}
+                  style={{ position: 'relative', width: BAR_W, flexShrink: 0, cursor: 'pointer' }}
+                  onMouseEnter={() => setHoveredIdx(i)}
+                  onMouseLeave={() => setHoveredIdx(null)}
+                >
+                  {/* Hover tooltip */}
+                  {isHov && (
+                    <div style={{
+                      position: 'absolute', bottom: barH + 8, left: '50%',
+                      transform: 'translateX(-50%)',
+                      background: 'var(--bg)', border: `1px solid ${color}`,
+                      borderRadius: 8, padding: '6px 10px', zIndex: 10,
+                      whiteSpace: 'nowrap', boxShadow: `0 4px 16px rgba(0,0,0,0.3)`,
+                      pointerEvents: 'none',
+                    }}>
+                      <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 2 }}>{fmtWeek(w.week)}</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color, fontFamily: 'var(--font-display)' }}>{w.score}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text3)' }}>
+                        {w.score >= idealScore ? '✨ beat ideal' : `${idealScore - w.score} pts behind`}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bar */}
+                  <div style={{
+                    width: BAR_W, height: barH,
+                    borderRadius: '4px 4px 0 0',
+                    background: isHov
+                      ? color
+                      : `linear-gradient(180deg, ${color}dd 0%, ${color}88 100%)`,
+                    transition: 'height 0.4s ease, opacity 0.15s',
+                    opacity: hoveredIdx !== null && !isHov ? 0.45 : 1,
+                    position: 'relative',
+                  }}>
+                    {/* Score label on bar if tall enough */}
+                    {barH > 28 && (
+                      <div style={{
+                        position: 'absolute', top: 6, left: 0, right: 0,
+                        textAlign: 'center', fontSize: 10, fontWeight: 700,
+                        color: '#fff', opacity: 0.9,
+                      }}>{w.score}</div>
+                    )}
+                    {/* "This week" indicator */}
+                    {isLast && (
+                      <div style={{
+                        position: 'absolute', top: -18, left: 0, right: 0,
+                        textAlign: 'center', fontSize: 9, fontWeight: 700, color,
+                      }}>NOW</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* X-axis date labels */}
+          <div style={{ position: 'absolute', left: 28, top: HEIGHT + 6, display: 'flex', gap: BAR_GAP }}>
+            {weeks.map((w, i) => {
+              const showLabel = weeks.length <= 8 || i % 2 === 0 || i === weeks.length - 1
+              return (
+                <div key={w.week} style={{ width: BAR_W, flexShrink: 0, textAlign: 'center' }}>
+                  {showLabel && (
+                    <div style={{ fontSize: 9, color: hoveredIdx === i ? scoreColor(w.score) : 'var(--text3)', fontWeight: hoveredIdx === i ? 700 : 400, lineHeight: 1.2 }}>
+                      {fmtWeek(w.week).replace(' ', '\n')}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
+
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: 14, marginTop: 12, fontSize: 11, color: 'var(--text3)', flexWrap: 'wrap' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 12, height: 3, background: '#fbbf24', display: 'inline-block', borderRadius: 1 }} />
+          Ideal Joseph ({idealScore})
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: '#22c55e', display: 'inline-block' }} />
+          At or above ideal
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: '#f59e0b', display: 'inline-block' }} />
+          Within 15 pts
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: '#9f91ff', display: 'inline-block' }} />
+          Building
+        </span>
+      </div>
+
+      {/* Motivational note */}
+      {weeks.length >= 2 && (
+        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: 'var(--bg3)', fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+          {trend > 5
+            ? `🔥 You're trending up +${trend} pts from last week. Keep this energy.`
+            : trend >= 0
+            ? `📈 Holding steady. Consistency is the game — keep showing up.`
+            : `⚡ Down ${Math.abs(trend)} pts from last week. One focused week flips this. You know what to do.`}
+        </div>
+      )}
     </div>
   )
 }
 
+// ─── Main view ────────────────────────────────────────────────────────────────
 
 export default function IdealJosephView({ pillarScores, lifeScore, weeklyHistory = [] }) {
   const idealScore = calcIdealLifeScore()
@@ -213,7 +314,7 @@ export default function IdealJosephView({ pillarScores, lifeScore, weeklyHistory
         }}>
           <strong>{gap <= 10 ? '🌟 So close!' : gap <= 25 ? '⚡ You can close this gap!' : '🔥 Time to level up.'}</strong>{' '}
           {IDEAL_NAME} is scoring <strong>{idealScore}</strong> this week. You're at <strong>{lifeScore}</strong>. That's a <strong>{gap}-point gap</strong>.
-          {gap <= 10 ? ' You\'re nearly matching your ideal self. Stay consistent.' : gap <= 25 ? ' One focused week can close most of this gap.' : ' Pick the weakest pillar below and attack it first.'}
+          {gap <= 10 ? " You're nearly matching your ideal self. Stay consistent." : gap <= 25 ? ' One focused week can close most of this gap.' : ' Pick the weakest pillar below and attack it first.'}
         </div>
       )}
       {gap === 0 && (
@@ -225,16 +326,15 @@ export default function IdealJosephView({ pillarScores, lifeScore, weeklyHistory
       {/* Pillar-by-pillar comparison */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {PILLARS.map(p => {
-          const actual = pillarScores[p.key] || 0
+          const actual    = pillarScores[p.key] || 0
           const benchmark = IDEAL_WEEKLY_BENCHMARKS[p.key]
-          const ideal = benchmark?.score || 100
-          const status = getGapStatus(actual, p.key)
-          const catchup = getCatchUpPlan(p.key, actual)
-          const weight = PILLAR_WEIGHTS[p.key === 'learning' ? 'learning' : p.key]
+          const ideal     = benchmark?.score || 100
+          const status    = getGapStatus(actual, p.key)
+          const catchup   = getCatchUpPlan(p.key, actual)
+          const weight    = PILLAR_WEIGHTS[p.key === 'learning' ? 'learning' : p.key]
 
           return (
             <div key={p.key} className="card" style={{ borderLeft: `3px solid ${p.color}` }}>
-              {/* Pillar header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 22 }}>{p.icon}</span>
@@ -250,7 +350,6 @@ export default function IdealJosephView({ pillarScores, lifeScore, weeklyHistory
 
               <GapMeter actual={actual} ideal={ideal} color={p.color} />
 
-              {/* Side-by-side comparison table */}
               <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: 12 }}>
                   <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>You</div>
@@ -264,7 +363,6 @@ export default function IdealJosephView({ pillarScores, lifeScore, weeklyHistory
                 </div>
               </div>
 
-              {/* Catch-up plan */}
               {catchup && status !== 'on-track' && (
                 <div style={{ marginTop: 12, padding: '12px 14px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--red)', marginBottom: 4 }}>🔴 3-day catch-up plan</div>
@@ -282,17 +380,17 @@ export default function IdealJosephView({ pillarScores, lifeScore, weeklyHistory
         <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.9 }}>
           {PILLARS.map(p => {
             const actual = pillarScores[p.key] || 0
-            const ideal = IDEAL_WEEKLY_BENCHMARKS[p.key]?.score || 100
-            const gap = ideal - actual
+            const ideal  = IDEAL_WEEKLY_BENCHMARKS[p.key]?.score || 100
+            const gap    = ideal - actual
             if (gap === 0) return <div key={p.key}>{p.icon} <strong>{p.label}:</strong> <span style={{ color: 'var(--green)' }}>✨ Perfect — matching {IDEAL_NAME}!</span></div>
             return (
               <div key={p.key}>
                 {p.icon} <strong>{p.label}:</strong>{' '}
                 <span style={{ color: gap <= 10 ? 'var(--amber)' : 'var(--red)' }}>
                   {IDEAL_NAME} scored {ideal}. You scored {actual}. That's {gap} points and roughly{' '}
-                  {p.key === 'fitness' ? `${Math.round(gap * 1.35)} minutes of training` :
+                  {p.key === 'fitness'  ? `${Math.round(gap * 1.35)} minutes of training` :
                    p.key === 'learning' ? `${(gap * 0.07).toFixed(1)} hours of learning` :
-                   p.key === 'habits' ? `${Math.round(gap / 14)} habit misses per day` :
+                   p.key === 'habits'   ? `${Math.round(gap / 14)} habit misses per day` :
                    `${gap} execution points`} left on the table.
                 </span>
               </div>
@@ -301,8 +399,8 @@ export default function IdealJosephView({ pillarScores, lifeScore, weeklyHistory
         </div>
       </div>
 
-      {/* Weekly history calendar */}
-      <WeeklyHistoryCalendar weeklyHistory={weeklyHistory} idealScore={idealScore} />
+      {/* ── Weekly history chart ── */}
+      <WeeklyHistoryChart weeklyHistory={weeklyHistory} idealScore={idealScore} />
 
       {/* The frameworks — collapsible */}
       <div className="card" style={{ marginTop: 16 }}>
@@ -317,14 +415,14 @@ export default function IdealJosephView({ pillarScores, lifeScore, weeklyHistory
         {frameworksOpen && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
             {[
-              { icon: '🧠', title: 'Atomic Habits', author: 'James Clear', note: 'Identity-based habits. 2-minute rule. 4 laws of behaviour change.' },
-              { icon: '📅', title: 'The 12 Week Year', author: 'Brian Moran', note: 'Treat each week like a quarter. 95% execution is world-class.' },
-              { icon: '💪', title: 'Huberman Lab', author: 'Andrew Huberman', note: '3x resistance + 135 min Zone 2/week + 7.5h sleep. Non-negotiable.' },
-              { icon: '🧘', title: 'CBT + ACT', author: 'Aaron Beck + Steven Hayes', note: 'Daily check-ins, trigger awareness, thought reframing. The inner game.' },
-              { icon: '❤️', title: 'Never Eat Alone + Give and Take', author: 'Ferrazzi + Grant', note: '5-minute rule: genuine attention keeps relationships warm. Give first, always.' },
-              { icon: '📚', title: 'Ultralearning', author: 'Scott Young', note: 'Learn by doing. Retrieval practice beats re-reading. Teach to know.' },
-              { icon: '🎯', title: 'The ONE Thing', author: 'Gary Keller', note: 'What\'s the ONE thing that makes everything else easier or unnecessary?' },
-              { icon: '🔮', title: 'WOOP Method', author: 'Dr. Gabriele Oettingen', note: 'Seeing your ideal self vividly increases follow-through. Science-backed.' },
+              { icon: '🧠', title: 'Atomic Habits',                   author: 'James Clear',              note: 'Identity-based habits. 2-minute rule. 4 laws of behaviour change.' },
+              { icon: '📅', title: 'The 12 Week Year',                author: 'Brian Moran',              note: 'Treat each week like a quarter. 95% execution is world-class.' },
+              { icon: '💪', title: 'Huberman Lab',                    author: 'Andrew Huberman',          note: '3x resistance + 135 min Zone 2/week + 7.5h sleep. Non-negotiable.' },
+              { icon: '🧘', title: 'CBT + ACT',                       author: 'Aaron Beck + Steven Hayes',note: 'Daily check-ins, trigger awareness, thought reframing. The inner game.' },
+              { icon: '❤️', title: 'Never Eat Alone + Give and Take', author: 'Ferrazzi + Grant',         note: '5-minute rule: genuine attention keeps relationships warm. Give first, always.' },
+              { icon: '📚', title: 'Ultralearning',                   author: 'Scott Young',              note: 'Learn by doing. Retrieval practice beats re-reading. Teach to know.' },
+              { icon: '🎯', title: 'The ONE Thing',                   author: 'Gary Keller',              note: "What's the ONE thing that makes everything else easier or unnecessary?" },
+              { icon: '🔮', title: 'WOOP Method',                     author: 'Dr. Gabriele Oettingen',  note: 'Seeing your ideal self vividly increases follow-through. Science-backed.' },
             ].map(f => (
               <div key={f.title} style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                 <span style={{ fontSize: 20, flexShrink: 0 }}>{f.icon}</span>
