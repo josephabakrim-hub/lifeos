@@ -48,91 +48,106 @@ function WeeklyComparison({ pillarScores }) {
   )
 }
 
-function WeeklyHistoryChart({ weeklyHistory = [], idealScore }) {
+function WeeklyHistoryCalendar({ weeklyHistory = [], idealScore }) {
+  const [expandedWeek, setExpandedWeek] = useState(null)
   if (!weeklyHistory || weeklyHistory.length === 0) return null
 
-  const sorted = [...weeklyHistory].sort((a, b) => a.week.localeCompare(b.week)).slice(-12)
-  const maxScore = 100
-  const chartH = 90
-  const chartW = 100
-
-  const toX = (i) => (i / Math.max(sorted.length - 1, 1)) * chartW
-  const toY = (v) => chartH - (v / maxScore) * chartH
-
-  const userPoints = sorted.map((d, i) => `${toX(i)},${toY(d.score)}`).join(' ')
-  const idealPoints = sorted.map((d, i) => `${toX(i)},${toY(idealScore)}`).join(' ')
-  const userAreaPoints = [
-    `${toX(0)},${chartH}`,
-    ...sorted.map((d, i) => `${toX(i)},${toY(d.score)}`),
-    `${toX(sorted.length - 1)},${chartH}`,
-  ].join(' ')
+  const sorted = [...weeklyHistory].sort((a, b) => b.week.localeCompare(a.week)) // newest first
 
   return (
     <div style={{ marginTop: 20 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>
-        Weekly history — you vs Ideal Joseph
-      </div>
-      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 16px 10px', overflow: 'hidden' }}>
-        {/* Legend */}
-        <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 20, height: 3, borderRadius: 2, background: '#7c6aff' }} />
-            <span style={{ fontSize: 11, color: 'var(--text3)' }}>You</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: 0.8 }}>
-            <svg width="20" height="6"><line x1="0" y1="3" x2="20" y2="3" stroke="#fbbf24" strokeWidth="2" strokeDasharray="4,3"/></svg>
-            <span style={{ fontSize: 11, color: 'var(--text3)' }}>Ideal Joseph</span>
+      <div className="card" style={{ border: '1px solid rgba(251,191,36,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div className="card-title" style={{ margin: 0 }}>📅 Past weeks — You vs {IDEAL_NAME}</div>
+          <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--text3)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />≥ ideal
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />close
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />behind
+            </span>
           </div>
         </div>
-        {/* Chart */}
-        <svg viewBox="-6 -4 112 114" style={{ width: '100%', display: 'block' }}>
-          <defs>
-            <linearGradient id="userGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#7c6aff" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#7c6aff" stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
-          {[25, 50, 75, 100].map(v => (
-            <g key={v}>
-              <line x1="0" y1={toY(v)} x2={chartW} y2={toY(v)} stroke="var(--border)" strokeWidth="0.5" strokeDasharray="3,3" />
-              <text x="-2" y={toY(v) + 3} fontSize="7" fill="var(--text3)" textAnchor="end">{v}</text>
-            </g>
-          ))}
-          <polygon points={userAreaPoints} fill="url(#userGrad)" />
-          <polyline points={idealPoints} fill="none" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="4,3" strokeOpacity="0.75" />
-          <polyline points={userPoints} fill="none" stroke="#7c6aff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          {sorted.map((d, i) => {
-            const x = toX(i)
-            const y = toY(d.score)
-            const isLast = i === sorted.length - 1
-            const gap = idealScore - d.score
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {sorted.map(entry => {
+            const isOpen   = expandedWeek === entry.week
+            const yourScore = Math.round(entry.score)
+            const gap      = idealScore - yourScore
             const dotColor = gap <= 0 ? '#22c55e' : gap <= 15 ? '#f59e0b' : '#ef4444'
+            const bgColor  = gap <= 0 ? 'rgba(34,197,94,0.08)' : gap <= 15 ? 'rgba(245,158,11,0.07)' : 'rgba(239,68,68,0.06)'
+            const borderColor = gap <= 0 ? 'rgba(34,197,94,0.25)' : gap <= 15 ? 'rgba(245,158,11,0.25)' : 'rgba(239,68,68,0.2)'
+            const pct = Math.round((yourScore / idealScore) * 100)
+
+            // Format week label e.g. "Mar 24 – Mar 30"
+            const weekDate = new Date(entry.week + 'T12:00:00')
+            const endDate  = new Date(weekDate); endDate.setDate(endDate.getDate() + 6)
+            const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            const weekLabel = `${fmt(weekDate)} – ${fmt(endDate)}`
+
             return (
-              <g key={d.week}>
-                <circle cx={x} cy={y} r={isLast ? 4 : 2.5} fill={dotColor} stroke="var(--bg2)" strokeWidth="1.5" />
-                {(i === 0 || isLast || sorted.length <= 6) && (
-                  <text x={x} y={chartH + 12} fontSize="7" fill="var(--text3)" textAnchor="middle">{d.week.slice(5)}</text>
+              <div key={entry.week} style={{ borderRadius: 8, overflow: 'hidden', border: `1px solid ${isOpen ? borderColor : 'var(--border)'}` }}>
+                {/* Row */}
+                <div
+                  onClick={() => setExpandedWeek(isOpen ? null : entry.week)}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', cursor: 'pointer', background: isOpen ? bgColor : 'var(--bg3)', gap: 10 }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>{weekLabel}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    {/* Mini score comparison */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                      <span style={{ fontWeight: 700, color: dotColor }}>{yourScore}</span>
+                      <span style={{ color: 'var(--text3)' }}>vs</span>
+                      <span style={{ fontWeight: 700, color: '#fbbf24' }}>{idealScore}</span>
+                    </div>
+                    <span style={{ fontSize: 11, color: 'var(--text3)' }}>{isOpen ? '▲' : '▼'}</span>
+                  </div>
+                </div>
+
+                {/* Expanded detail */}
+                {isOpen && (
+                  <div style={{ padding: '14px 16px', background: 'var(--bg2)', borderTop: `1px solid ${borderColor}` }}>
+                    {/* Progress bar comparison */}
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text3)', marginBottom: 6 }}>
+                        <span>Your score</span>
+                        <span style={{ color: '#fbbf24' }}>Ideal Joseph target</span>
+                      </div>
+                      <div style={{ position: 'relative', height: 12, background: 'var(--bg4)', borderRadius: 6, overflow: 'visible' }}>
+                        <div style={{ height: '100%', borderRadius: 6, background: dotColor, width: `${Math.min(yourScore, 100)}%`, transition: 'width 0.4s ease' }} />
+                        <div style={{ position: 'absolute', top: -3, left: `${Math.min(idealScore, 100)}%`, width: 2, height: 18, background: '#fbbf24', borderRadius: 1 }} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontSize: 11 }}>
+                        <span style={{ color: dotColor, fontWeight: 700 }}>{yourScore} pts ({pct}% of ideal)</span>
+                        <span style={{ color: '#fbbf24', fontWeight: 600 }}>{idealScore} pts</span>
+                      </div>
+                    </div>
+
+                    {/* Gap summary */}
+                    <div style={{
+                      padding: '10px 12px', borderRadius: 8, fontSize: 13,
+                      background: gap <= 0 ? 'rgba(34,197,94,0.08)' : gap <= 15 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.07)',
+                      border: `1px solid ${borderColor}`,
+                      color: 'var(--text2)', lineHeight: 1.6,
+                    }}>
+                      {gap <= 0
+                        ? <span>✨ <strong>You matched or beat Ideal Joseph</strong> this week. This is what peak looks like.</span>
+                        : gap <= 10
+                        ? <span>🟡 <strong>{gap} pts behind</strong> — so close. One more focused day would have closed this gap.</span>
+                        : gap <= 25
+                        ? <span>🟠 <strong>{gap} pts behind</strong> — a solid week, but there's room. Identify your weakest pillar and attack it.</span>
+                        : <span>🔴 <strong>{gap} pts behind</strong> — tough week. Remember: one bad week doesn't define the journey. Reset and go again.</span>
+                      }
+                    </div>
+                  </div>
                 )}
-                {isLast && (
-                  <text x={x + 5} y={y - 6} fontSize="9" fill="#7c6aff" fontWeight="600">{Math.round(d.score)}</text>
-                )}
-              </g>
-            )
-          })}
-        </svg>
-        {/* Score pills */}
-        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
-          {sorted.slice(-8).map((d, i, arr) => {
-            const gap = idealScore - d.score
-            const isLast = i === arr.length - 1
-            const bg   = gap <= 0 ? 'rgba(34,197,94,0.12)' : gap <= 15 ? 'rgba(245,158,11,0.1)' : 'rgba(124,106,255,0.1)'
-            const col  = gap <= 0 ? '#22c55e' : gap <= 15 ? '#f59e0b' : '#9f91ff'
-            return (
-              <div key={d.week} style={{
-                padding: '3px 8px', borderRadius: 20, fontSize: 11, fontWeight: isLast ? 700 : 500,
-                background: bg, color: col, border: isLast ? `1px solid ${col}55` : 'none',
-              }}>
-                {d.week.slice(5)} · {Math.round(d.score)}
               </div>
             )
           })}
@@ -141,6 +156,7 @@ function WeeklyHistoryChart({ weeklyHistory = [], idealScore }) {
     </div>
   )
 }
+
 
 export default function IdealJosephView({ pillarScores, lifeScore, weeklyHistory = [] }) {
   const idealScore = calcIdealLifeScore()
@@ -285,8 +301,8 @@ export default function IdealJosephView({ pillarScores, lifeScore, weeklyHistory
         </div>
       </div>
 
-      {/* Weekly history chart */}
-      <WeeklyHistoryChart weeklyHistory={weeklyHistory} idealScore={idealScore} />
+      {/* Weekly history calendar */}
+      <WeeklyHistoryCalendar weeklyHistory={weeklyHistory} idealScore={idealScore} />
 
       {/* The frameworks — collapsible */}
       <div className="card" style={{ marginTop: 16 }}>
