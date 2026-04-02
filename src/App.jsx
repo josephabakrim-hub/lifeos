@@ -257,14 +257,26 @@ export default function App() {
           </>
         )}
         {activeTab === 'habits'  && <HabitsView  {...habitsData} />}
-        {activeTab === 'weekly'  && <WeeklyView  {...weeklyData} />}
+        {activeTab === 'weekly'  && (
+          <WeeklyView
+            {...weeklyData}
+            savePlan={data => weeklyData.savePlan({ ...data, lifeScore })}
+          />
+        )}
         {activeTab === 'fitness' && <FitnessView {...fitnessData} />}
         {activeTab === 'mental'  && <MentalView  {...mentalData} />}
         {activeTab === 'social'  && <SocialView  {...socialData} />}
         {activeTab === 'learn'   && <LearnView   {...learnData} />}
         {activeTab === 'goals'   && <GoalsView   {...goalsData} />}
         {activeTab === 'ideal'   && (
-          <IdealJosephView pillarScores={pillarScores} lifeScore={lifeScore} />
+          <IdealJosephView
+            pillarScores={pillarScores}
+            lifeScore={lifeScore}
+            weeklyHistory={(weeklyData.plans || [])
+              .filter(p => p.weekStart && p.lifeScore != null)
+              .map(p => ({ week: p.weekStart, score: p.lifeScore }))
+            }
+          />
         )}
       </main>
     </div>

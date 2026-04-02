@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { IDEAL_WEEKLY_BENCHMARKS, IDEAL_NAME, calcIdealLifeScore, PILLAR_WEIGHTS, getCatchUpPlan, getGapStatus } from '../lib/idealJoseph'
 import { scoreColor } from '../lib/utils'
 
@@ -47,9 +48,104 @@ function WeeklyComparison({ pillarScores }) {
   )
 }
 
-export default function IdealJosephView({ pillarScores, lifeScore }) {
+function WeeklyHistoryChart({ weeklyHistory = [], idealScore }) {
+  if (!weeklyHistory || weeklyHistory.length === 0) return null
+
+  const sorted = [...weeklyHistory].sort((a, b) => a.week.localeCompare(b.week)).slice(-12)
+  const maxScore = 100
+  const chartH = 90
+  const chartW = 100
+
+  const toX = (i) => (i / Math.max(sorted.length - 1, 1)) * chartW
+  const toY = (v) => chartH - (v / maxScore) * chartH
+
+  const userPoints = sorted.map((d, i) => `${toX(i)},${toY(d.score)}`).join(' ')
+  const idealPoints = sorted.map((d, i) => `${toX(i)},${toY(idealScore)}`).join(' ')
+  const userAreaPoints = [
+    `${toX(0)},${chartH}`,
+    ...sorted.map((d, i) => `${toX(i)},${toY(d.score)}`),
+    `${toX(sorted.length - 1)},${chartH}`,
+  ].join(' ')
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>
+        Weekly history — you vs Ideal Joseph
+      </div>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 16px 10px', overflow: 'hidden' }}>
+        {/* Legend */}
+        <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 20, height: 3, borderRadius: 2, background: '#7c6aff' }} />
+            <span style={{ fontSize: 11, color: 'var(--text3)' }}>You</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: 0.8 }}>
+            <svg width="20" height="6"><line x1="0" y1="3" x2="20" y2="3" stroke="#fbbf24" strokeWidth="2" strokeDasharray="4,3"/></svg>
+            <span style={{ fontSize: 11, color: 'var(--text3)' }}>Ideal Joseph</span>
+          </div>
+        </div>
+        {/* Chart */}
+        <svg viewBox="-6 -4 112 114" style={{ width: '100%', display: 'block' }}>
+          <defs>
+            <linearGradient id="userGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#7c6aff" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#7c6aff" stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+          {[25, 50, 75, 100].map(v => (
+            <g key={v}>
+              <line x1="0" y1={toY(v)} x2={chartW} y2={toY(v)} stroke="var(--border)" strokeWidth="0.5" strokeDasharray="3,3" />
+              <text x="-2" y={toY(v) + 3} fontSize="7" fill="var(--text3)" textAnchor="end">{v}</text>
+            </g>
+          ))}
+          <polygon points={userAreaPoints} fill="url(#userGrad)" />
+          <polyline points={idealPoints} fill="none" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="4,3" strokeOpacity="0.75" />
+          <polyline points={userPoints} fill="none" stroke="#7c6aff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          {sorted.map((d, i) => {
+            const x = toX(i)
+            const y = toY(d.score)
+            const isLast = i === sorted.length - 1
+            const gap = idealScore - d.score
+            const dotColor = gap <= 0 ? '#22c55e' : gap <= 15 ? '#f59e0b' : '#ef4444'
+            return (
+              <g key={d.week}>
+                <circle cx={x} cy={y} r={isLast ? 4 : 2.5} fill={dotColor} stroke="var(--bg2)" strokeWidth="1.5" />
+                {(i === 0 || isLast || sorted.length <= 6) && (
+                  <text x={x} y={chartH + 12} fontSize="7" fill="var(--text3)" textAnchor="middle">{d.week.slice(5)}</text>
+                )}
+                {isLast && (
+                  <text x={x + 5} y={y - 6} fontSize="9" fill="#7c6aff" fontWeight="600">{Math.round(d.score)}</text>
+                )}
+              </g>
+            )
+          })}
+        </svg>
+        {/* Score pills */}
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+          {sorted.slice(-8).map((d, i, arr) => {
+            const gap = idealScore - d.score
+            const isLast = i === arr.length - 1
+            const bg   = gap <= 0 ? 'rgba(34,197,94,0.12)' : gap <= 15 ? 'rgba(245,158,11,0.1)' : 'rgba(124,106,255,0.1)'
+            const col  = gap <= 0 ? '#22c55e' : gap <= 15 ? '#f59e0b' : '#9f91ff'
+            return (
+              <div key={d.week} style={{
+                padding: '3px 8px', borderRadius: 20, fontSize: 11, fontWeight: isLast ? 700 : 500,
+                background: bg, color: col, border: isLast ? `1px solid ${col}55` : 'none',
+              }}>
+                {d.week.slice(5)} · {Math.round(d.score)}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function IdealJosephView({ pillarScores, lifeScore, weeklyHistory = [] }) {
   const idealScore = calcIdealLifeScore()
   const gap = idealScore - lifeScore
+  const [frameworksOpen, setFrameworksOpen] = useState(false)
 
   return (
     <div className="fade-in">
@@ -189,29 +285,41 @@ export default function IdealJosephView({ pillarScores, lifeScore }) {
         </div>
       </div>
 
-      {/* The frameworks */}
+      {/* Weekly history chart */}
+      <WeeklyHistoryChart weeklyHistory={weeklyHistory} idealScore={idealScore} />
+
+      {/* The frameworks — collapsible */}
       <div className="card" style={{ marginTop: 16 }}>
-        <div className="card-title">📖 The frameworks powering Ideal Joseph</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {[
-            { icon: '🧠', title: 'Atomic Habits', author: 'James Clear', note: 'Identity-based habits. 2-minute rule. 4 laws of behaviour change.' },
-            { icon: '📅', title: 'The 12 Week Year', author: 'Brian Moran', note: 'Treat each week like a quarter. 95% execution is world-class.' },
-            { icon: '💪', title: 'Huberman Lab', author: 'Andrew Huberman', note: '3x resistance + 135 min Zone 2/week + 7.5h sleep. Non-negotiable.' },
-            { icon: '🧘', title: 'CBT + ACT', author: 'Aaron Beck + Steven Hayes', note: 'Daily check-ins, trigger awareness, thought reframing. The inner game.' },
-            { icon: '❤️', title: 'Never Eat Alone + Give and Take', author: 'Ferrazzi + Grant', note: '5-minute rule: genuine attention keeps relationships warm. Give first, always.' },
-            { icon: '📚', title: 'Ultralearning', author: 'Scott Young', note: 'Learn by doing. Retrieval practice beats re-reading. Teach to know.' },
-            { icon: '🎯', title: 'The ONE Thing', author: 'Gary Keller', note: 'What\'s the ONE thing that makes everything else easier or unnecessary?' },
-            { icon: '🔮', title: 'WOOP Method', author: 'Dr. Gabriele Oettingen', note: 'Seeing your ideal self vividly increases follow-through. Science-backed.' },
-          ].map(f => (
-            <div key={f.title} style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ fontSize: 20, flexShrink: 0 }}>{f.icon}</span>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{f.title} <span style={{ color: 'var(--text3)', fontWeight: 400, fontSize: 12 }}>— {f.author}</span></div>
-                <div style={{ fontSize: 12, color: 'var(--text3)' }}>{f.note}</div>
-              </div>
-            </div>
-          ))}
+        <div
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none' }}
+          onClick={() => setFrameworksOpen(o => !o)}
+        >
+          <div className="card-title" style={{ marginBottom: 0 }}>📖 The frameworks powering {IDEAL_NAME}</div>
+          <span style={{ fontSize: 13, color: 'var(--text3)', marginLeft: 12 }}>{frameworksOpen ? '▲' : '▼'}</span>
         </div>
+
+        {frameworksOpen && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
+            {[
+              { icon: '🧠', title: 'Atomic Habits', author: 'James Clear', note: 'Identity-based habits. 2-minute rule. 4 laws of behaviour change.' },
+              { icon: '📅', title: 'The 12 Week Year', author: 'Brian Moran', note: 'Treat each week like a quarter. 95% execution is world-class.' },
+              { icon: '💪', title: 'Huberman Lab', author: 'Andrew Huberman', note: '3x resistance + 135 min Zone 2/week + 7.5h sleep. Non-negotiable.' },
+              { icon: '🧘', title: 'CBT + ACT', author: 'Aaron Beck + Steven Hayes', note: 'Daily check-ins, trigger awareness, thought reframing. The inner game.' },
+              { icon: '❤️', title: 'Never Eat Alone + Give and Take', author: 'Ferrazzi + Grant', note: '5-minute rule: genuine attention keeps relationships warm. Give first, always.' },
+              { icon: '📚', title: 'Ultralearning', author: 'Scott Young', note: 'Learn by doing. Retrieval practice beats re-reading. Teach to know.' },
+              { icon: '🎯', title: 'The ONE Thing', author: 'Gary Keller', note: 'What\'s the ONE thing that makes everything else easier or unnecessary?' },
+              { icon: '🔮', title: 'WOOP Method', author: 'Dr. Gabriele Oettingen', note: 'Seeing your ideal self vividly increases follow-through. Science-backed.' },
+            ].map(f => (
+              <div key={f.title} style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ fontSize: 20, flexShrink: 0 }}>{f.icon}</span>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{f.title} <span style={{ color: 'var(--text3)', fontWeight: 400, fontSize: 12 }}>— {f.author}</span></div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)' }}>{f.note}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
