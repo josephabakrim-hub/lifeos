@@ -79,11 +79,9 @@ function getHabitStage(logs, habitId) {
 
   if (totalDays === 0) return { stage: 1, day: 0, label: 'Stage 1 — Initiation', stagePct: 0, mastered: false }
 
-  // Days since first log
   const firstDate  = new Date(doneDates[0])
   const daysSince  = Math.round((new Date() - firstDate) / 86400000) + 1
 
-  // Rate over last N days
   function rateOver(n) {
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - n)
@@ -93,7 +91,6 @@ function getHabitStage(logs, habitId) {
     return possible > 0 ? (done / possible) : 0
   }
 
-  // Longest gap (for "never miss twice" check over 90d)
   function longestGapLast90() {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90)
     const cutoffStr = formatDate(cutoff)
@@ -111,25 +108,21 @@ function getHabitStage(logs, habitId) {
   const rate90 = rateOver(90)
   const maxGap = longestGapLast90()
 
-  // Auto-mastery check
   const mastered =
     (daysSince >= 66 && rate90 >= 0.80) ||
     (daysSince >= 90 && rate90 >= 0.75 && maxGap <= 2)
 
   if (mastered) return { stage: 4, day: totalDays, label: '✦ Mastered', stagePct: 100, mastered: true }
 
-  // Stage 3 — Stability (91+ days, 80%+ rate over 90d)
   if (daysSince >= 91 && rate90 >= 0.80) {
     return { stage: 3, day: daysSince, label: 'Stage 3 — Stability', stagePct: Math.min(100, Math.round((daysSince / 180) * 100)), mastered: false }
   }
 
-  // Stage 2 — Learning (31–90 days, 80%+ rate over 30d)
   if (daysSince >= 31 && rate30 >= 0.80) {
     const pct = Math.min(100, Math.round(((daysSince - 30) / 60) * 100))
     return { stage: 2, day: daysSince, label: 'Stage 2 — Learning', stagePct: pct, mastered: false }
   }
 
-  // Stage 1 — Initiation
   const pct = Math.min(100, Math.round((daysSince / 30) * 100))
   return { stage: 1, day: daysSince, label: 'Stage 1 — Initiation', stagePct: pct, mastered: false }
 }
@@ -273,6 +266,110 @@ function MasteryModal({ habit, onClose }) {
   )
 }
 
+// ─── Retroactive Day Log Modal ────────────────────────────────────────────────
+
+function RetroLogModal({ dateStr, habits, logs, toggleHabitLog, onClose }) {
+  const activeHabits = habits.filter(h => h.active && !h.mastered)
+  const today = formatDate()
+  const isFuture = dateStr > today
+
+  const friendlyDate = new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric'
+  })
+
+  function isDone(habitId) {
+    return !!logs.find(l => l.habitId === habitId && l.date === dateStr && l.done)
+  }
+
+  const doneCount = activeHabits.filter(h => isDone(h.id)).length
+  const pct = activeHabits.length > 0 ? Math.round((doneCount / activeHabits.length) * 100) : 0
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <div className="modal-title" style={{ margin: 0 }}>
+            {dateStr === today ? '✅ Today' : '📅 ' + friendlyDate}
+          </div>
+          <button className="btn btn-sm" onClick={onClose}>✕</button>
+        </div>
+
+        {isFuture ? (
+          <p style={{ fontSize: 13, color: 'var(--text3)', marginTop: 12 }}>
+            Can't log habits for future dates.
+          </p>
+        ) : (
+          <>
+            {/* Score bar */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text3)', marginBottom: 4 }}>
+                <span>{doneCount}/{activeHabits.length} habits</span>
+                <span style={{ fontWeight: 700, color: pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)' }}>{pct}%</span>
+              </div>
+              <div className="progress-bar" style={{ height: 6 }}>
+                <div className="progress-fill" style={{
+                  width: `${pct}%`,
+                  background: pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)'
+                }} />
+              </div>
+            </div>
+
+            {activeHabits.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text3)' }}>No active habits to log.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {activeHabits.map(habit => {
+                  const done = isDone(habit.id)
+                  return (
+                    <div
+                      key={habit.id}
+                      onClick={() => toggleHabitLog(habit.id, dateStr)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                        background: done ? `${habit.color}18` : 'var(--bg3)',
+                        border: `1px solid ${done ? habit.color : 'var(--border)'}`,
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {/* Checkbox */}
+                      <div style={{
+                        width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                        border: `2px solid ${done ? habit.color : 'var(--border2)'}`,
+                        background: done ? habit.color : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 12, color: '#fff', fontWeight: 700,
+                      }}>
+                        {done ? '✓' : ''}
+                      </div>
+                      <span style={{ fontSize: 18 }}>{habit.icon}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{
+                          fontWeight: 600, fontSize: 14,
+                          color: done ? 'var(--text3)' : 'var(--text)',
+                          textDecoration: done ? 'line-through' : 'none',
+                        }}>{habit.name}</div>
+                        {habit.description && (
+                          <div style={{ fontSize: 11, color: 'var(--text3)' }}>{habit.description}</div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text3)', textAlign: 'center', lineHeight: 1.5 }}>
+              {dateStr !== today && '📝 Retroactive log — tap any habit to toggle it for this day'}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Heatmap ──────────────────────────────────────────────────────────────────
 
 function HabitHeatmap({ habitId, logs, rangeDays }) {
@@ -324,7 +421,6 @@ function HabitCard({ habit, logs, today, toggleHabitLog, onEdit, onArchive, onDe
   const rate30 = getCompletionRate(logs, habit.id, 30)
   const stageInfo = useMemo(() => getHabitStage(logs, habit.id), [logs, habit.id])
 
-  // Trigger mastery auto-archive
   useEffect(() => {
     if (stageInfo.mastered && habit.active && !habit.mastered) {
       onMastered(habit)
@@ -356,108 +452,87 @@ function HabitCard({ habit, logs, today, toggleHabitLog, onEdit, onArchive, onDe
           {streak > 0 && <span className="streak">🔥 {streak}d</span>}
           <span className="badge badge-blue">{rate30}% / 30d</span>
           <button className="btn btn-sm" title="Edit" onClick={onEdit}>✏️</button>
-          <button className="btn btn-sm" title="Archive" style={{ color: 'var(--amber)', borderColor: 'var(--amber)' }} onClick={onArchive}>📦</button>
-          <button className="btn btn-sm btn-danger" title="Delete permanently" onClick={onDelete}>✕</button>
+          <button className="btn btn-sm" title="Archive" onClick={onArchive}>📦</button>
+          <button className="btn btn-sm btn-danger" title="Delete" onClick={onDelete}>✕</button>
         </div>
       </div>
 
-      {/* Stage indicator */}
-      <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'var(--bg3)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ color: stageColor, fontSize: 13, fontWeight: 700 }}>{STAGE_ICONS[stageInfo.stage]}</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: stageColor }}>{stageInfo.label}</span>
-          </div>
-          <span style={{ fontSize: 11, color: 'var(--text3)' }}>
-            {stageInfo.stage < 4
-              ? `Day ${stageInfo.day} / ${stageGoal}`
-              : 'Auto-achieved'
-            }
-          </span>
+      {/* Stage bar */}
+      <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 12, color: stageColor, fontWeight: 700, flexShrink: 0 }}>
+          {STAGE_ICONS[stageInfo.stage]} {stageInfo.label}
+        </span>
+        <div style={{ flex: 1, height: 4, background: 'var(--bg4)', borderRadius: 2 }}>
+          <div style={{ height: '100%', borderRadius: 2, background: stageColor, width: `${stageInfo.stagePct}%`, transition: 'width 0.6s ease' }} />
         </div>
-        <div style={{ height: 4, background: 'var(--bg4)', borderRadius: 2, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${stageInfo.stagePct}%`, background: stageColor, borderRadius: 2, transition: 'width 0.4s ease' }} />
-        </div>
-        {stageInfo.stage === 1 && <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>Needs willpower — building the neural pathway</div>}
-        {stageInfo.stage === 2 && <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>Getting natural — identity is forming</div>}
-        {stageInfo.stage === 3 && <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>Stable — on track to automaticity</div>}
+        <span style={{ fontSize: 11, color: 'var(--text3)', flexShrink: 0 }}>Day {stageInfo.day}/{stageGoal}</span>
       </div>
 
-      {/* Heatmap range toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}>
-        <span style={{ fontSize: 11, color: 'var(--text3)', marginRight: 2 }}>Heatmap:</span>
+      {/* Heatmap range */}
+      <div style={{ marginTop: 10, display: 'flex', gap: 4 }}>
         {HEATMAP_RANGES.map(r => (
-          <button key={r.days} onClick={() => setRangeDays(r.days)} style={{
-            fontSize: 11, padding: '2px 8px', borderRadius: 6, cursor: 'pointer',
-            border: `1px solid ${rangeDays === r.days ? (habit.color || 'var(--accent)') : 'var(--border2)'}`,
-            background: rangeDays === r.days ? (habit.color || 'var(--accent)') + '22' : 'transparent',
-            color: rangeDays === r.days ? (habit.color || 'var(--accent)') : 'var(--text3)',
-            fontWeight: rangeDays === r.days ? 600 : 400,
+          <button key={r.label} onClick={() => setRangeDays(r.days)} style={{
+            padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+            border: `1px solid ${rangeDays === r.days ? 'var(--accent)' : 'var(--border)'}`,
+            background: rangeDays === r.days ? 'var(--accent-glow)' : 'transparent',
+            color: rangeDays === r.days ? 'var(--accent)' : 'var(--text3)',
           }}>{r.label}</button>
         ))}
       </div>
-
       <HabitHeatmap habitId={habit.id} logs={logs} rangeDays={rangeDays} />
     </div>
   )
 }
 
-// ─── History tab with calendar ────────────────────────────────────────────────
+// ─── Stat row (history tab) ───────────────────────────────────────────────────
 
-function StatRow({ s, onEdit, onUnarchive, onArchive, onDelete }) {
-  const isArchived = !s.habit.active
-  const isMastered = !!s.habit.mastered
-  const stageColor = isMastered ? '#a855f7' : STAGE_COLORS[s.stageInfo?.stage || 1]
+function StatRow({ s, onEdit, onArchive, onUnarchive, onDelete }) {
+  const { habit, stageInfo, allTimeRate, longestStreak, currentStreak, totalDays } = s
+  const stageColor = STAGE_COLORS[stageInfo.stage]
+  const isArchived = !habit.active && !habit.mastered
 
   return (
-    <div className="card" style={{ borderLeft: `3px solid ${isMastered ? '#a855f7' : (s.habit.color || 'var(--accent)')}`, marginBottom: 10 }}>
+    <div className="card" style={{ marginBottom: 10, borderLeft: `3px solid ${habit.color || 'var(--accent)'}` }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ fontSize: 22 }}>{s.habit.icon}</span>
+        <span style={{ fontSize: 22 }}>{habit.icon}</span>
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: 14 }}>{s.habit.name}</div>
-          {s.stageInfo && !isMastered && (
-            <div style={{ fontSize: 11, color: stageColor, fontWeight: 600, marginTop: 2 }}>
-              {STAGE_ICONS[s.stageInfo.stage]} {s.stageInfo.label} — Day {s.stageInfo.day}
-            </div>
-          )}
-          {isMastered && <div style={{ fontSize: 11, color: '#a855f7', fontWeight: 600, marginTop: 2 }}>✦ Mastered — built into identity</div>}
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{habit.name}</div>
+          <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text3)', flexWrap: 'wrap' }}>
+            <span style={{ color: stageColor, fontWeight: 700 }}>{STAGE_ICONS[stageInfo.stage]} {stageInfo.label}</span>
+            <span>🔥 Best streak: {longestStreak}d</span>
+            <span>⚡ Current: {currentStreak}d</span>
+            <span>📅 Total: {totalDays} days</span>
+            <span>📊 All-time: {allTimeRate}%</span>
+          </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 52px)', gap: 6, textAlign: 'center' }}>
-          {[
-            { value: `${s.allTimeRate}%`,   label: 'All-time'    },
-            { value: `${s.longestStreak}d`, label: 'Best streak' },
-            { value: `${s.currentStreak}d`, label: 'Current'     },
-            { value: s.totalDays,           label: 'Total days'  },
-          ].map(({ value, label }) => (
-            <div key={label}>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: isMastered ? '#a855f7' : (s.habit.color || 'var(--accent)') }}>{value}</div>
-              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>{label}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <button className="btn btn-sm" title="Edit" onClick={onEdit}>✏️</button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="btn btn-sm" onClick={onEdit}>✏️</button>
           {isArchived
-            ? <button className="btn btn-sm" title="Unarchive" style={{ color: 'var(--green)', borderColor: 'var(--green)' }} onClick={onUnarchive}>♻️</button>
-            : <button className="btn btn-sm" title="Archive" style={{ color: 'var(--amber)', borderColor: 'var(--amber)' }} onClick={onArchive}>📦</button>
+            ? <button className="btn btn-sm" style={{ color: 'var(--green)', borderColor: 'var(--green)' }} onClick={onUnarchive}>♻️</button>
+            : <button className="btn btn-sm" style={{ color: 'var(--amber)', borderColor: 'var(--amber)' }} onClick={onArchive}>📦</button>
           }
-          <button className="btn btn-sm btn-danger" title="Delete permanently" onClick={onDelete}>✕</button>
+          <button className="btn btn-sm btn-danger" onClick={onDelete}>✕</button>
         </div>
       </div>
     </div>
   )
 }
 
-function HabitsCalendar({ logs, habits }) {
-  const now = new Date()
-  const [year,  setYear]  = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth())
-  const [popup, setPopup] = useState(null)
+// ─── Calendar with retroactive logging ───────────────────────────────────────
 
-  const monthName   = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-  const firstDay    = new Date(year, month, 1).getDay()
+function HabitsCalendar({ logs, habits, toggleHabitLog }) {
+  const now = new Date()
+  const [year,       setYear]       = useState(now.getFullYear())
+  const [month,      setMonth]      = useState(now.getMonth())
+  const [retroDate,  setRetroDate]  = useState(null) // date string for retro modal
+
+  const today      = formatDate()
+  const monthName  = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const firstDay   = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const blanks      = firstDay === 0 ? 6 : firstDay - 1
+  const blanks     = firstDay === 0 ? 6 : firstDay - 1
+
+  const activeHabits = habits.filter(h => h.active && !h.mastered)
 
   // Map dateStr -> done habit ids
   const byDay = useMemo(() => {
@@ -469,92 +544,105 @@ function HabitsCalendar({ logs, habits }) {
     return map
   }, [logs])
 
-  const habitMap = useMemo(() => {
-    const m = {}
-    habits.forEach(h => m[h.id] = h)
-    return m
-  }, [habits])
+  function handleDayClick(dateStr) {
+    if (dateStr > today) return // no future logging
+    setRetroDate(dateStr)
+  }
 
   return (
-    <div className="card" style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div className="card-title" style={{ margin: 0 }}>📅 Calendar</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button className="btn btn-sm" onClick={() => { if (month === 0) { setMonth(11); setYear(y => y-1) } else setMonth(m => m-1) }}>‹</button>
-          <span style={{ fontSize: 13, fontWeight: 600, minWidth: 130, textAlign: 'center' }}>{monthName}</span>
-          <button className="btn btn-sm" onClick={() => { if (month === 11) { setMonth(0); setYear(y => y+1) } else setMonth(m => m+1) }}>›</button>
-        </div>
-      </div>
-
-      {/* Day headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
-        {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
-          <div key={d} style={{ textAlign: 'center', fontSize: 11, color: 'var(--text3)', fontWeight: 600, padding: '4px 0' }}>{d}</div>
-        ))}
-      </div>
-
-      {/* Day cells */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
-        {Array(blanks).fill(null).map((_, i) => <div key={`b${i}`} />)}
-        {Array(daysInMonth).fill(null).map((_, i) => {
-          const day     = i + 1
-          const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
-          const doneIds = byDay[dateStr] || []
-          const isToday = dateStr === formatDate()
-          const pct     = habits.filter(h => h.active).length > 0
-            ? Math.round((doneIds.length / habits.filter(h => h.active).length) * 100)
-            : 0
-          const dotColor = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : doneIds.length > 0 ? 'var(--red)' : null
-
-          return (
-            <div
-              key={day}
-              onClick={() => doneIds.length && setPopup(popup === dateStr ? null : dateStr)}
-              style={{
-                minHeight: 38, borderRadius: 6, display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center',
-                cursor: doneIds.length ? 'pointer' : 'default',
-                background: isToday ? 'var(--accent-glow)' : 'var(--bg3)',
-                border: `1px solid ${isToday ? 'var(--accent)' : 'transparent'}`,
-              }}
-            >
-              <span style={{ fontSize: 12, color: isToday ? 'var(--accent)' : 'var(--text2)', fontWeight: isToday ? 700 : 400 }}>{day}</span>
-              {dotColor && <div style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, marginTop: 2 }} />}
+    <>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div>
+            <div className="card-title" style={{ margin: 0 }}>📅 Calendar</div>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+              Tap any past day to log or edit habits retroactively
             </div>
-          )
-        })}
-      </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button className="btn btn-sm" onClick={() => { if (month === 0) { setMonth(11); setYear(y => y-1) } else setMonth(m => m-1) }}>‹</button>
+            <span style={{ fontSize: 13, fontWeight: 600, minWidth: 130, textAlign: 'center' }}>{monthName}</span>
+            <button className="btn btn-sm" onClick={() => { if (month === 11) { setMonth(0); setYear(y => y+1) } else setMonth(m => m+1) }}>›</button>
+          </div>
+        </div>
 
-      {/* Day popup */}
-      {popup && byDay[popup] && (
-        <div style={{ marginTop: 12, background: 'var(--bg2)', borderRadius: 8, padding: '12px 14px', border: '1px solid var(--border2)' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', marginBottom: 8 }}>{popup}</div>
-          {byDay[popup].map(hid => {
-            const h = habitMap[hid]
-            if (!h) return null
+        {/* Day headers */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
+          {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
+            <div key={d} style={{ textAlign: 'center', fontSize: 11, color: 'var(--text3)', fontWeight: 600, padding: '4px 0' }}>{d}</div>
+          ))}
+        </div>
+
+        {/* Day cells */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+          {Array(blanks).fill(null).map((_, i) => <div key={`b${i}`} />)}
+          {Array(daysInMonth).fill(null).map((_, i) => {
+            const day     = i + 1
+            const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+            const doneIds = byDay[dateStr] || []
+            const isToday = dateStr === today
+            const isFuture = dateStr > today
+            const isSelected = retroDate === dateStr
+
+            const pct = activeHabits.length > 0
+              ? Math.round((doneIds.length / activeHabits.length) * 100)
+              : 0
+            const dotColor = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : doneIds.length > 0 ? 'var(--red)' : null
+
             return (
-              <div key={hid} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', fontSize: 13, borderBottom: '1px solid var(--border)' }}>
-                <span>{h.icon}</span>
-                <span style={{ color: h.color || 'var(--accent)', fontWeight: 600 }}>{h.name}</span>
+              <div
+                key={day}
+                onClick={() => !isFuture && handleDayClick(dateStr)}
+                style={{
+                  minHeight: 38, borderRadius: 6, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  cursor: isFuture ? 'default' : 'pointer',
+                  background: isSelected
+                    ? 'var(--accent-glow)'
+                    : isToday
+                    ? 'var(--accent-glow)'
+                    : 'var(--bg3)',
+                  border: `1px solid ${isSelected ? 'var(--accent)' : isToday ? 'var(--accent)' : 'transparent'}`,
+                  opacity: isFuture ? 0.3 : 1,
+                  transition: 'background 0.1s, border-color 0.1s',
+                }}
+                onMouseEnter={e => { if (!isFuture) e.currentTarget.style.borderColor = 'var(--border2)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = isSelected || isToday ? 'var(--accent)' : 'transparent' }}
+              >
+                <span style={{ fontSize: 12, color: isToday || isSelected ? 'var(--accent)' : 'var(--text2)', fontWeight: isToday || isSelected ? 700 : 400 }}>{day}</span>
+                {dotColor && <div style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, marginTop: 2 }} />}
               </div>
             )
           })}
         </div>
-      )}
 
-      {/* Legend */}
-      <div style={{ display: 'flex', gap: 16, marginTop: 10, fontSize: 11, color: 'var(--text3)' }}>
-        {[['var(--green)','80%+ done'],['var(--amber)','50–79%'],['var(--red)','Under 50%']].map(([c,l]) => (
-          <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, display: 'inline-block' }} />{l}
-          </span>
-        ))}
+        {/* Legend */}
+        <div style={{ display: 'flex', gap: 16, marginTop: 10, fontSize: 11, color: 'var(--text3)' }}>
+          {[['var(--green)','80%+ done'],['var(--amber)','50–79%'],['var(--red)','Under 50%']].map(([c,l]) => (
+            <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, display: 'inline-block' }} />{l}
+            </span>
+          ))}
+        </div>
       </div>
-    </div>
+
+      {/* Retroactive log modal */}
+      {retroDate && (
+        <RetroLogModal
+          dateStr={retroDate}
+          habits={habits}
+          logs={logs}
+          toggleHabitLog={toggleHabitLog}
+          onClose={() => setRetroDate(null)}
+        />
+      )}
+    </>
   )
 }
 
-function HistoryTab({ habits, logs, updateHabit, deleteHabit, onEditHabit }) {
+// ─── History tab ──────────────────────────────────────────────────────────────
+
+function HistoryTab({ habits, logs, updateHabit, deleteHabit, onEditHabit, toggleHabitLog }) {
   const stats = useMemo(() =>
     habits.map(h => ({
       habit:         h,
@@ -584,7 +672,8 @@ function HistoryTab({ habits, logs, updateHabit, deleteHabit, onEditHabit }) {
 
   return (
     <div className="fade-in">
-      <HabitsCalendar logs={logs} habits={habits} />
+      {/* Calendar now has retroactive logging built in */}
+      <HabitsCalendar logs={logs} habits={habits} toggleHabitLog={toggleHabitLog} />
 
       {section('Active habits — all-time stats', activeStats, s => (
         <StatRow key={s.habit.id} s={s}
@@ -622,6 +711,8 @@ function HistoryTab({ habits, logs, updateHabit, deleteHabit, onEditHabit }) {
     </div>
   )
 }
+
+// ─── Preset panel ─────────────────────────────────────────────────────────────
 
 function PresetPanel({ habits, addHabit, onClose }) {
   const activeCount   = habits.filter(h => h.active).length
@@ -671,13 +762,13 @@ function PresetPanel({ habits, addHabit, onClose }) {
 // ─── Main view ────────────────────────────────────────────────────────────────
 
 export default function HabitsView({ habits, logs, loading, addHabit, updateHabit, deleteHabit, toggleHabitLog, getTodayScore }) {
-  const [innerTab,     setInnerTab]     = useState('today')
-  const [showModal,    setShowModal]    = useState(false)
-  const [showPresets,  setShowPresets]  = useState(false)
-  const [showWarning,  setShowWarning]  = useState(false)
-  const [pendingAdd,   setPendingAdd]   = useState(null)
-  const [editHabit,    setEditHabit]    = useState(null)
-  const [masteredHabit, setMasteredHabit] = useState(null) // celebration modal
+  const [innerTab,      setInnerTab]      = useState('today')
+  const [showModal,     setShowModal]     = useState(false)
+  const [showPresets,   setShowPresets]   = useState(false)
+  const [showWarning,   setShowWarning]   = useState(false)
+  const [pendingAdd,    setPendingAdd]    = useState(null)
+  const [editHabit,     setEditHabit]     = useState(null)
+  const [masteredHabit, setMasteredHabit] = useState(null)
 
   const today          = formatDate()
   const todayScore     = getTodayScore()
@@ -702,7 +793,6 @@ export default function HabitsView({ habits, logs, loading, addHabit, updateHabi
   }
 
   function handleMastered(habit) {
-    // Auto-archive + mark mastered, free up the slot
     updateHabit(habit.id, { active: false, mastered: true, masteredAt: formatDate() })
     setMasteredHabit(habit)
   }
@@ -793,6 +883,7 @@ export default function HabitsView({ habits, logs, loading, addHabit, updateHabi
           updateHabit={updateHabit}
           deleteHabit={deleteHabit}
           onEditHabit={habit => { setEditHabit(habit); setShowModal(true) }}
+          toggleHabitLog={toggleHabitLog}
         />
       )}
 
