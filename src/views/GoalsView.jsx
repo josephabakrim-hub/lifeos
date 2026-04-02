@@ -508,11 +508,16 @@ export default function GoalsView({ goals, loading, addGoal, updateGoal, deleteG
             const thisWeekCommit = goal.weeklyCommitments?.find(w => w.week === formatDate())
 
             return (
-              <div key={goal.id} className="card" style={{ borderLeft: `3px solid ${isOverdue ? '#ef4444' : color}` }}>
+              <div
+                key={goal.id}
+                className="card"
+                style={{ borderLeft: `3px solid ${isOverdue ? '#ef4444' : color}`, cursor: 'pointer' }}
+                onClick={() => setExpandedGoal(isExpanded ? null : goal.id)}
+              >
 
-                {/* Header row */}
+                {/* ── COLLAPSED VIEW (always visible) ── */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
 
                     {/* Badges row */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
@@ -525,11 +530,77 @@ export default function GoalsView({ goals, loading, addGoal, updateGoal, deleteG
                     </div>
 
                     {/* Title */}
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{goal.title}</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{goal.title}</div>
+
+                    {/* Progress bar */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div className="progress-bar" style={{ flex: 1, height: 8 }}>
+                        <div className="progress-fill" style={{ width: `${progress}%`, background: isOverdue ? '#ef4444' : color }} />
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: isOverdue ? '#ef4444' : color }}>{progress}%</span>
+                    </div>
+
+                    {/* Mini metrics row — only shown when collapsed */}
+                    {!isExpanded && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+                        {milestones.length > 0 && (
+                          <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+                            📌 {doneMilestones}/{milestones.length} milestones
+                          </span>
+                        )}
+                        {streak > 0 && (
+                          <span style={{ fontSize: 11, color: streak >= 7 ? '#f97316' : '#f59e0b' }}>
+                            🔥 {streak}d streak
+                          </span>
+                        )}
+                        {todayOneThing && (
+                          <span style={{ fontSize: 11, color: '#22c55e' }}>✓ ONE Thing done</span>
+                        )}
+                        {thisWeekCommit && (
+                          <span style={{ fontSize: 11, color: '#7c6aff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>
+                            📅 {thisWeekCommit.text}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action buttons — stop propagation so clicks don't toggle expand */}
+                  <div
+                    style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <button
+                      className="btn btn-sm"
+                      style={{ background: todayOneThing ? 'var(--green-bg)' : 'var(--bg3)', borderColor: todayOneThing ? 'var(--green)' : 'var(--border2)', color: todayOneThing ? 'var(--green)' : 'var(--text)' }}
+                      onClick={() => { setSelectedGoal(goal); setShowOneThingModal(true) }}
+                      title="Log today's ONE Thing"
+                    >
+                      {todayOneThing ? '✓ Done' : '🎯 ONE Thing'}
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      style={{ background: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.4)', color: '#22c55e' }}
+                      onClick={() => { setSelectedGoal(goal); setShowCompleteModal(true) }}
+                      title="Mark as complete"
+                    >✓ Complete</button>
+                    <button className="btn btn-sm" onClick={() => { setEditGoal(goal); setShowGoalModal(true) }}>✏️</button>
+                    <button className="btn btn-sm btn-danger" onClick={() => deleteGoal(goal.id)}>✕</button>
+                  </div>
+                </div>
+
+                {/* Expand/collapse chevron hint */}
+                <div style={{ textAlign: 'center', marginTop: 6, fontSize: 11, color: 'var(--text3)', userSelect: 'none' }}>
+                  {isExpanded ? '▲ less' : '▼ more'}
+                </div>
+
+                {/* ── EXPANDED SECTION ── */}
+                {isExpanded && (
+                  <div style={{ marginTop: 12 }} onClick={e => e.stopPropagation()}>
 
                     {/* Description */}
                     {goal.description && (
-                      <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 4 }}>{goal.description}</div>
+                      <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 8 }}>{goal.description}</div>
                     )}
 
                     {/* WHY anchor */}
@@ -555,54 +626,18 @@ export default function GoalsView({ goals, loading, addGoal, updateGoal, deleteG
                       </div>
                     )}
 
-                    {/* Progress bar */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div className="progress-bar" style={{ flex: 1, height: 8 }}>
-                        <div className="progress-fill" style={{ width: `${progress}%`, background: isOverdue ? '#ef4444' : color }} />
-                      </div>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: isOverdue ? '#ef4444' : color }}>{progress}%</span>
-                    </div>
-
+                    {/* Milestone count (full) */}
                     {milestones.length > 0 && (
-                      <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>{doneMilestones}/{milestones.length} milestones</div>
+                      <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>{doneMilestones}/{milestones.length} milestones</div>
                     )}
 
                     {/* Countdown bar */}
                     <CountdownBar targetDate={goal.targetDate} createdAt={goal.createdAt} progress={progress} />
-                  </div>
-
-                  {/* Action buttons */}
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    <button
-                      className="btn btn-sm"
-                      style={{ background: todayOneThing ? 'var(--green-bg)' : 'var(--bg3)', borderColor: todayOneThing ? 'var(--green)' : 'var(--border2)', color: todayOneThing ? 'var(--green)' : 'var(--text)' }}
-                      onClick={() => { setSelectedGoal(goal); setShowOneThingModal(true) }}
-                      title="Log today's ONE Thing"
-                    >
-                      {todayOneThing ? '✓ Done' : '🎯 ONE Thing'}
-                    </button>
-                    <button
-                      className="btn btn-sm"
-                      style={{ background: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.4)', color: '#22c55e' }}
-                      onClick={() => { setSelectedGoal(goal); setShowCompleteModal(true) }}
-                      title="Mark as complete"
-                    >✓ Complete</button>
-                    <button className="btn btn-sm" onClick={() => setExpandedGoal(isExpanded ? null : goal.id)}>
-                      {isExpanded ? '▲' : '▼'}
-                    </button>
-                    <button className="btn btn-sm" onClick={() => { setEditGoal(goal); setShowGoalModal(true) }}>✏️</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => deleteGoal(goal.id)}>✕</button>
-                  </div>
-                </div>
-
-                {/* Expanded section */}
-                {isExpanded && (
-                  <div style={{ marginTop: 16 }}>
 
                     {/* Milestones with optional deadlines */}
                     {milestones.length > 0 && (
                       <>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', marginBottom: 8 }}>Milestones</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', marginBottom: 8, marginTop: 14 }}>Milestones</div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                           {milestones.map((m, i) => {
                             const mDays = m.dueDate ? getCountdown(m.dueDate) : null
