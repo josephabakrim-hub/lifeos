@@ -257,7 +257,7 @@ export default function App() {
           </>
         )}
         {activeTab === 'habits'  && <HabitsView  {...habitsData} />}
-        {activeTab === 'weekly'  && <WeeklyView  {...weeklyData} />}
+        {activeTab === 'weekly'  && <WeeklyView  {...weeklyData} goalsData={goalsData} />}
         {activeTab === 'fitness' && <FitnessView {...fitnessData} />}
         {activeTab === 'mental'  && <MentalView  {...mentalData} />}
         {activeTab === 'social'  && <SocialView  {...socialData} />}
