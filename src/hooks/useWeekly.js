@@ -62,7 +62,9 @@ export function useWeekly() {
     if (!goals.length) return 0
     const done = goals.filter(g => g.done).length
     const executionScore = Math.round((done / goals.length) * 100)
-    const reviewBonus = (plan.sundayPlanDone ? 10 : 0) + (plan.fridayReviewDone ? 10 : 0)
+    const sundayDone = plan.sundayReviewDone ?? plan.sundayPlanDone ?? false
+    const mondayDone = plan.mondayPlanDone   ?? plan.fridayReviewDone ?? false
+    const reviewBonus = (sundayDone ? 10 : 0) + (mondayDone ? 10 : 0)
     return Math.min(100, Math.round(executionScore * 0.8 + reviewBonus))
   }
 

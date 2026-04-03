@@ -44,7 +44,9 @@ export function useWeeklyHistory({ habitsData, weeklyData, fitnessData, mentalDa
         if (goals.length > 0) {
           const done = goals.filter(g => g.done).length
           const execScore = Math.round((done / goals.length) * 100)
-          const reviewBonus = (plan.sundayPlanDone ? 10 : 0) + (plan.fridayReviewDone ? 10 : 0)
+          const _sunDone = plan.sundayReviewDone ?? plan.sundayPlanDone ?? false
+          const _monDone = plan.mondayPlanDone   ?? plan.fridayReviewDone ?? false
+          const reviewBonus = (_sunDone ? 10 : 0) + (_monDone ? 10 : 0)
           weeklyScore = Math.min(100, Math.round(execScore * 0.8 + reviewBonus))
         }
       }

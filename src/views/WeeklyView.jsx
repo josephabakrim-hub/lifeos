@@ -16,15 +16,21 @@ const DEEP_WORK_TARGET = 28
 const DAY_KEYS   = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 const DAY_LABELS = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' }
 
+const DEFAULT_GOALS = () => [
+  { text: '', done: false },
+  { text: '', done: false },
+  { text: '', done: false },
+]
+
 // ─── Past-week edit modal ─────────────────────────────────────────────────────
 
 function PastWeekModal({ weekStart, plan, onClose, onSave }) {
-  const [goals,          setGoals]          = useState(plan?.goals || [{ text: '', done: false }, { text: '', done: false }, { text: '', done: false }])
-  const [reflection,     setReflection]     = useState(plan?.reflection || {})
-  const [sundayPlanDone, setSunday]         = useState(plan?.sundayPlanDone || false)
-  const [fridayReview,   setFriday]         = useState(plan?.fridayReviewDone || false)
-  const [deepWorkDays,   setDeepWorkDays]   = useState(plan?.deepWorkDays || {})
-  const [saving,         setSaving]         = useState(false)
+  const [goals,           setGoals]          = useState(plan?.goals?.length ? plan.goals : DEFAULT_GOALS())
+  const [reflection,      setReflection]     = useState(plan?.reflection || {})
+  const [sundayReviewDone,setSunday]         = useState(plan?.sundayReviewDone ?? plan?.sundayPlanDone ?? false)
+  const [mondayPlanDone,  setMonday]         = useState(plan?.mondayPlanDone   ?? plan?.fridayReviewDone ?? false)
+  const [deepWorkDays,    setDeepWorkDays]   = useState(plan?.deepWorkDays || {})
+  const [saving,          setSaving]         = useState(false)
 
   const deepWorkVal = Object.values(deepWorkDays).reduce((s, v) => s + (parseFloat(v) || 0), 0)
 
@@ -32,8 +38,8 @@ function PastWeekModal({ weekStart, plan, onClose, onSave }) {
     setSaving(true)
     await onSave(weekStart, {
       goals, reflection,
-      sundayPlanDone: sundayPlanDone,
-      fridayReviewDone: fridayReview,
+      sundayReviewDone,
+      mondayPlanDone,
       deepWorkDays,
       deepWorkHours: deepWorkVal,
     })
@@ -43,26 +49,38 @@ function PastWeekModal({ weekStart, plan, onClose, onSave }) {
 
   function setRef(key, val) { setReflection(r => ({ ...r, [key]: val })) }
 
+  function addGoal() {
+    if (goals.length < 5) setGoals(g => [...g, { text: '', done: false }])
+  }
+  function removeGoal(i) {
+    if (goals.length > 3) setGoals(g => g.filter((_, idx) => idx !== i))
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
         <div className="modal-title">✏️ Edit week — {getWeekLabel(weekStart)}</div>
 
+        {/* Rituals */}
         <div className="form-group">
           <label>Weekly rituals</label>
           {[
-            { label: '📋 Sunday planning session', val: sundayPlanDone, set: setSunday },
-            { label: '🔍 Friday review session',   val: fridayReview,   set: setFriday },
-          ].map(({ label, val, set }) => (
+            { label: '🌙 Sunday evening review', sub: 'Score last week · close it out mentally', val: sundayReviewDone, set: setSunday },
+            { label: '☀️ Monday morning plan',   sub: 'Set this week\'s goals · block deep work', val: mondayPlanDone,   set: setMonday },
+          ].map(({ label, sub, val, set }) => (
             <div key={label} onClick={() => set(!val)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, cursor: 'pointer', marginBottom: 6, background: val ? 'rgba(34,197,94,0.1)' : 'var(--bg3)', border: `1px solid ${val ? 'var(--green)' : 'var(--border2)'}` }}>
               <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${val ? 'var(--green)' : 'var(--border2)'}`, background: val ? 'var(--green)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {val && <span style={{ color: '#fff', fontSize: 11 }}>✓</span>}
               </div>
-              <span style={{ fontSize: 14 }}>{label}</span>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{label}</div>
+                <div style={{ fontSize: 11, color: 'var(--text3)' }}>{sub}</div>
+              </div>
             </div>
           ))}
         </div>
 
+        {/* Deep work per day */}
         <div className="form-group">
           <label>Deep work hours per day</label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
@@ -76,19 +94,29 @@ function PastWeekModal({ weekStart, plan, onClose, onSave }) {
           <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text3)' }}>Total: <strong style={{ color: 'var(--text)' }}>{deepWorkVal.toFixed(1)}h</strong></div>
         </div>
 
+        {/* Goals */}
         <div className="form-group">
-          <label>Top 3 goals</label>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <label style={{ margin: 0 }}>Goals this week <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(3 default, up to 5)</span></label>
+            {goals.length < 5 && (
+              <button onClick={addGoal} style={{ background: 'none', border: '1px dashed var(--border2)', borderRadius: 6, color: 'var(--text3)', fontSize: 12, padding: '2px 10px', cursor: 'pointer' }}>+ Add goal</button>
+            )}
+          </div>
           {goals.map((goal, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
               <div className={`checkbox ${goal.done && goal.text ? 'checked' : ''}`} onClick={() => goal.text && setGoals(goals.map((g, idx) => idx === i ? { ...g, done: !g.done } : g))} style={{ cursor: goal.text ? 'pointer' : 'default', flexShrink: 0 }}>
                 {goal.done && goal.text ? '✓' : ''}
               </div>
               <span style={{ color: 'var(--text3)', fontWeight: 700, fontSize: 14, width: 20, flexShrink: 0 }}>{i + 1}</span>
-              <input value={goal.text} onChange={e => setGoals(goals.map((g, idx) => idx === i ? { ...g, text: e.target.value } : g))} placeholder={`Goal ${i + 1}`} style={{ textDecoration: goal.done ? 'line-through' : 'none', color: goal.done ? 'var(--text3)' : 'var(--text)' }} />
+              <input value={goal.text} onChange={e => setGoals(goals.map((g, idx) => idx === i ? { ...g, text: e.target.value } : g))} placeholder={i < 3 ? `Goal ${i + 1}` : `Extra goal ${i + 1} (optional)`} style={{ flex: 1, textDecoration: goal.done ? 'line-through' : 'none', color: goal.done ? 'var(--text3)' : 'var(--text)' }} />
+              {i >= 3 && (
+                <button onClick={() => removeGoal(i)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px', flexShrink: 0 }} title="Remove">×</button>
+              )}
             </div>
           ))}
         </div>
 
+        {/* Reflection */}
         <div className="form-group">
           <label>Weekly reflection</label>
           {REFLECTION_QUESTIONS.map((q, i) => (
@@ -166,7 +194,9 @@ function WeeklyCalendar({ plans, allPlans, savePlanForWeek, deletePlan }) {
     if (!goals.length) return 0
     const done = goals.filter(g => g.done).length
     const exec = Math.round((done / goals.length) * 100)
-    const bonus = (plan.sundayPlanDone ? 10 : 0) + (plan.fridayReviewDone ? 10 : 0)
+    const sunDone = plan.sundayReviewDone ?? plan.sundayPlanDone ?? false
+    const monDone = plan.mondayPlanDone   ?? plan.fridayReviewDone ?? false
+    const bonus = (sunDone ? 10 : 0) + (monDone ? 10 : 0)
     return Math.min(100, Math.round(exec * 0.8 + bonus))
   }
 
@@ -265,7 +295,7 @@ function WeeklyCalendar({ plans, allPlans, savePlanForWeek, deletePlan }) {
 function MilestonePickerModal({ goals, onSelect, onClose }) {
   const milestones = []
   goals.filter(g => g.status === 'active').forEach(goal => {
-    ;(goal.milestones || []).forEach((m, idx) => {
+    ;(goal.milestones || []).forEach(m => {
       if (!m.done) milestones.push({ goalTitle: goal.title, text: m.text })
     })
   })
@@ -281,13 +311,7 @@ function MilestonePickerModal({ goals, onSelect, onClose }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {milestones.map((m, i) => (
-              <div
-                key={i}
-                onClick={() => { onSelect(m.text); onClose() }}
-                style={{ padding: '10px 14px', borderRadius: 8, cursor: 'pointer', background: 'var(--bg3)', border: '1px solid var(--border2)', transition: 'border-color 0.15s' }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border2)'}
-              >
+              <div key={i} onClick={() => { onSelect(m.text); onClose() }} style={{ padding: '10px 14px', borderRadius: 8, cursor: 'pointer', background: 'var(--bg3)', border: '1px solid var(--border2)', transition: 'border-color 0.15s' }} onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'} onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border2)'}>
                 <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 3 }}>🎯 {m.goalTitle}</div>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{m.text}</div>
               </div>
@@ -309,31 +333,29 @@ export default function WeeklyView({ plans, loading, getCurrentPlan, savePlan, s
   const weekLabel   = getWeekLabel(getWeekStart())
   const weekScore   = getWeekScore()
 
-  const [goals,           setGoals]           = useState([{ text: '', done: false }, { text: '', done: false }, { text: '', done: false }])
-  const [reflection,      setReflection]      = useState({})
-  const [sundayPlanDone,  setSundayPlanDone]  = useState(false)
-  const [fridayReviewDone,setFridayReviewDone]= useState(false)
-  const [deepWorkDays,    setDeepWorkDays]    = useState({})
-  const [showHistory,     setShowHistory]     = useState(false)
-  const [saving,          setSaving]          = useState(false)
-  const [saved,           setSaved]           = useState(false)
-  const [milestonePicker, setMilestonePicker] = useState(null) // goal slot index
+  const [goals,            setGoals]            = useState(DEFAULT_GOALS())
+  const [reflection,       setReflection]       = useState({})
+  const [sundayReviewDone, setSundayReviewDone] = useState(false)
+  const [mondayPlanDone,   setMondayPlanDone]   = useState(false)
+  const [deepWorkDays,     setDeepWorkDays]     = useState({})
+  const [showHistory,      setShowHistory]      = useState(false)
+  const [saving,           setSaving]           = useState(false)
+  const [saved,            setSaved]            = useState(false)
+  const [milestonePicker,  setMilestonePicker]  = useState(null)
 
   const autoSaveTimer = useRef(null)
 
   // ── Sync local state when plan loads ──────────────────────────────────────
   useEffect(() => {
     if (!currentPlan) return
-    setGoals(currentPlan.goals?.length
-      ? currentPlan.goals
-      : [{ text: '', done: false }, { text: '', done: false }, { text: '', done: false }])
+    setGoals(currentPlan.goals?.length ? currentPlan.goals : DEFAULT_GOALS())
     setReflection(currentPlan.reflection || {})
-    setSundayPlanDone(!!currentPlan.sundayPlanDone)
-    setFridayReviewDone(!!currentPlan.fridayReviewDone)
+    // Support new field names with legacy fallback
+    setSundayReviewDone(currentPlan.sundayReviewDone ?? currentPlan.sundayPlanDone ?? false)
+    setMondayPlanDone(currentPlan.mondayPlanDone     ?? currentPlan.fridayReviewDone ?? false)
     if (currentPlan.deepWorkDays) {
       setDeepWorkDays(currentPlan.deepWorkDays)
     } else if (currentPlan.deepWorkHours != null && currentPlan.deepWorkHours > 0) {
-      // Migrate old single-number: put it in Monday so nothing is lost
       setDeepWorkDays({ mon: String(currentPlan.deepWorkHours) })
     }
   }, [currentPlan?.id])
@@ -345,26 +367,18 @@ export default function WeeklyView({ plans, loading, getCurrentPlan, savePlan, s
 
   const completedGoals = goals.filter(g => g.done && g.text).length
   const totalGoals     = goals.filter(g => g.text).length
-  const goalsPct       = totalGoals > 0 ? (completedGoals / totalGoals) : 0
-  const ritualBonus    = (sundayPlanDone ? 10 : 0) + (fridayReviewDone ? 10 : 0)
+  const goalsPct       = totalGoals > 0 ? completedGoals / totalGoals : 0
+  const ritualBonus    = (sundayReviewDone ? 10 : 0) + (mondayPlanDone ? 10 : 0)
   const executionPct   = Math.min(100, Math.round(goalsPct * 80 + ritualBonus))
 
-  // Today's day key for highlighting
   const todayDayKey = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()]
 
-  // ── Auto-save (debounced 800ms) for goals + deep work ────────────────────
+  // ── Auto-save (debounced 800ms) ───────────────────────────────────────────
   function scheduleAutoSave(newGoals, newDeepWorkDays) {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     autoSaveTimer.current = setTimeout(async () => {
       const dw = Object.values(newDeepWorkDays).reduce((s, v) => s + (parseFloat(v) || 0), 0)
-      await savePlan({
-        goals: newGoals,
-        reflection,
-        sundayPlanDone,
-        fridayReviewDone,
-        deepWorkDays: newDeepWorkDays,
-        deepWorkHours: dw,
-      })
+      await savePlan({ goals: newGoals, reflection, sundayReviewDone, mondayPlanDone, deepWorkDays: newDeepWorkDays, deepWorkHours: dw })
     }, 800)
   }
 
@@ -380,6 +394,20 @@ export default function WeeklyView({ plans, loading, getCurrentPlan, savePlan, s
     scheduleAutoSave(goals, updated)
   }
 
+  function addGoal() {
+    if (goals.length >= 5) return
+    const updated = [...goals, { text: '', done: false }]
+    setGoals(updated)
+    scheduleAutoSave(updated, deepWorkDays)
+  }
+
+  function removeGoal(i) {
+    if (goals.length <= 3) return
+    const updated = goals.filter((_, idx) => idx !== i)
+    setGoals(updated)
+    scheduleAutoSave(updated, deepWorkDays)
+  }
+
   function setReflectionField(key, value) {
     setReflection(prev => ({ ...prev, [key]: value }))
   }
@@ -390,8 +418,8 @@ export default function WeeklyView({ plans, loading, getCurrentPlan, savePlan, s
     setter(next)
     await savePlan({
       goals, reflection,
-      sundayPlanDone:   field === 'sunday' ? next : sundayPlanDone,
-      fridayReviewDone: field === 'friday' ? next : fridayReviewDone,
+      sundayReviewDone: field === 'sunday' ? next : sundayReviewDone,
+      mondayPlanDone:   field === 'monday' ? next : mondayPlanDone,
       deepWorkDays,
       deepWorkHours: deepWorkVal,
     })
@@ -401,7 +429,7 @@ export default function WeeklyView({ plans, loading, getCurrentPlan, savePlan, s
   async function handleSave() {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     setSaving(true)
-    await savePlan({ goals, reflection, sundayPlanDone, fridayReviewDone, deepWorkDays, deepWorkHours: deepWorkVal })
+    await savePlan({ goals, reflection, sundayReviewDone, mondayPlanDone, deepWorkDays, deepWorkHours: deepWorkVal })
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -423,7 +451,7 @@ export default function WeeklyView({ plans, loading, getCurrentPlan, savePlan, s
       <div className="section-header">
         <div>
           <div className="section-title">📅 Weekly Planning</div>
-          <div style={{ fontSize: 13, color: 'var(--text3)', marginTop: 2 }}>Based on The 12 Week Year + Deep Work</div>
+          <div style={{ fontSize: 13, color: 'var(--text3)', marginTop: 2 }}>The 12 Week Year — Brian Moran · Deep Work — Cal Newport</div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 12, color: 'var(--text3)' }}>{weekLabel}</div>
@@ -437,19 +465,39 @@ export default function WeeklyView({ plans, loading, getCurrentPlan, savePlan, s
       <div className="grid-2" style={{ marginBottom: 16 }}>
         <div className="card">
           <div className="card-title">Weekly rituals</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-            {[
-              { label: '📋 Sunday planning session', sub: 'Set top 3 goals, block deep work, review last week', field: 'sunday', val: sundayPlanDone, setter: setSundayPlanDone },
-              { label: '🔍 Friday review session',   sub: 'Score your week, log wins and lessons',             field: 'friday', val: fridayReviewDone, setter: setFridayReviewDone },
-            ].map(({ label, sub, field, val, setter }) => (
-              <div key={field} onClick={() => toggleRitual(field, val, setter)} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', fontSize: 14 }}>
-                <div className={`checkbox ${val ? 'checked' : ''}`}>{val ? '✓' : ''}</div>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{label}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text3)' }}>{sub}</div>
-                </div>
+
+          {/* Sunday evening */}
+          <div
+            onClick={() => toggleRitual('sunday', sundayReviewDone, setSundayReviewDone)}
+            style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer', padding: '12px 14px', borderRadius: 10, marginBottom: 8, background: sundayReviewDone ? 'rgba(34,197,94,0.07)' : 'var(--bg3)', border: `1px solid ${sundayReviewDone ? 'rgba(34,197,94,0.35)' : 'var(--border2)'}`, transition: 'all 0.15s' }}
+          >
+            <div className={`checkbox ${sundayReviewDone ? 'checked' : ''}`} style={{ marginTop: 2, flexShrink: 0 }}>{sundayReviewDone ? '✓' : ''}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>🌙 Sunday evening — close the week</div>
+              <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>
+                Score last week's execution · reflect on what worked · write your weekly reflection · close it out mentally before the new week begins
               </div>
-            ))}
+              <div style={{ marginTop: 6, fontSize: 11, color: sundayReviewDone ? 'var(--green)' : 'var(--text3)', fontWeight: 600 }}>
+                {sundayReviewDone ? '✓ Done this week' : 'Not done yet — end of Sunday'}
+              </div>
+            </div>
+          </div>
+
+          {/* Monday morning */}
+          <div
+            onClick={() => toggleRitual('monday', mondayPlanDone, setMondayPlanDone)}
+            style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer', padding: '12px 14px', borderRadius: 10, marginBottom: 20, background: mondayPlanDone ? 'rgba(34,197,94,0.07)' : 'var(--bg3)', border: `1px solid ${mondayPlanDone ? 'rgba(34,197,94,0.35)' : 'var(--border2)'}`, transition: 'all 0.15s' }}
+          >
+            <div className={`checkbox ${mondayPlanDone ? 'checked' : ''}`} style={{ marginTop: 2, flexShrink: 0 }}>{mondayPlanDone ? '✓' : ''}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>☀️ Monday morning — open the week</div>
+              <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>
+                Set this week's goals · block your deep work time · review your 12-week plan · align daily actions with your goals
+              </div>
+              <div style={{ marginTop: 6, fontSize: 11, color: mondayPlanDone ? 'var(--green)' : 'var(--text3)', fontWeight: 600 }}>
+                {mondayPlanDone ? '✓ Done this week' : 'Not done yet — Monday morning'}
+              </div>
+            </div>
           </div>
 
           <div className="divider" />
@@ -457,16 +505,14 @@ export default function WeeklyView({ plans, loading, getCurrentPlan, savePlan, s
           {/* ── Daily deep work log ── */}
           <div>
             <div style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 600, marginBottom: 10 }}>
-              ⚡ Deep work hours <span style={{ fontSize: 12, color: 'var(--text3)', fontWeight: 400 }}>— add each day (auto-saves)</span>
+              ⚡ Deep work hours <span style={{ fontSize: 12, color: 'var(--text3)', fontWeight: 400 }}>— log each day (auto-saves)</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
               {DAY_KEYS.map(d => {
                 const isToday = d === todayDayKey
                 return (
                   <div key={d} style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--accent2)' : 'var(--text3)', marginBottom: 4 }}>
-                      {DAY_LABELS[d]}
-                    </div>
+                    <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--accent2)' : 'var(--text3)', marginBottom: 4 }}>{DAY_LABELS[d]}</div>
                     <input
                       type="number" min="0" max="16" step="0.5"
                       value={deepWorkDays[d] || ''}
@@ -496,6 +542,7 @@ export default function WeeklyView({ plans, loading, getCurrentPlan, savePlan, s
           </div>
         </div>
 
+        {/* Execution score card */}
         <div className="card">
           <div className="card-title">Execution score</div>
           <div style={{ textAlign: 'center', marginBottom: 16 }}>
@@ -509,31 +556,49 @@ export default function WeeklyView({ plans, loading, getCurrentPlan, savePlan, s
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--text3)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Goals (80%)</span>
+              <span>Goals completed (80%)</span>
               <span style={{ color: 'var(--text2)', fontWeight: 600 }}>{Math.round(goalsPct * 80)}pts</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Sunday ritual (+10%)</span>
-              <span style={{ color: sundayPlanDone ? 'var(--green)' : 'var(--text3)', fontWeight: 600 }}>{sundayPlanDone ? '+10' : '+0'}</span>
+              <span>🌙 Sunday review (+10)</span>
+              <span style={{ color: sundayReviewDone ? 'var(--green)' : 'var(--text3)', fontWeight: 600 }}>{sundayReviewDone ? '+10' : '+0'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Friday ritual (+10%)</span>
-              <span style={{ color: fridayReviewDone ? 'var(--green)' : 'var(--text3)', fontWeight: 600 }}>{fridayReviewDone ? '+10' : '+0'}</span>
+              <span>☀️ Monday plan (+10)</span>
+              <span style={{ color: mondayPlanDone ? 'var(--green)' : 'var(--text3)', fontWeight: 600 }}>{mondayPlanDone ? '+10' : '+0'}</span>
             </div>
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 4, marginTop: 2, display: 'flex', justifyContent: 'space-between' }}>
-              <span>Ideal Joseph</span>
+              <span>Ideal Joseph target</span>
               <span style={{ color: 'var(--amber)', fontWeight: 600 }}>95%</span>
             </div>
+          </div>
+
+          {/* 12WY context note */}
+          <div style={{ marginTop: 16, padding: '10px 12px', borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)', fontSize: 11, color: 'var(--text3)', lineHeight: 1.6 }}>
+            <strong style={{ color: 'var(--text2)' }}>The 12 Week Year rhythm:</strong> Sunday closes the old week. Monday opens the new one. They're separate moments — review comes first, then planning with a clear head.
           </div>
         </div>
       </div>
 
-      {/* ── Top 3 goals ── */}
+      {/* ── Goals this week ── */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <div className="card-title" style={{ margin: 0 }}>Top 3 goals this week</div>
-          <div style={{ fontSize: 11, color: 'var(--text3)' }}>Auto-saves · check off on Friday · 🎯 links to milestones</div>
+          <div>
+            <div className="card-title" style={{ margin: 0 }}>Goals this week</div>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>Default 3 · auto-saves as you type · check off when done · 🎯 links to milestones</div>
+          </div>
+          {goals.length < 5 && (
+            <button
+              onClick={addGoal}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'none', border: '1px dashed var(--border2)', color: 'var(--text3)', transition: 'all 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent2)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--text3)' }}
+            >
+              + Add goal <span style={{ fontSize: 10, opacity: 0.7 }}>({goals.length}/5)</span>
+            </button>
+          )}
         </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {goals.map((goal, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -544,12 +609,17 @@ export default function WeeklyView({ plans, loading, getCurrentPlan, savePlan, s
               >
                 {goal.done && goal.text ? '✓' : ''}
               </div>
-              <span style={{ color: 'var(--text3)', fontWeight: 700, fontSize: 14, width: 20, flexShrink: 0 }}>{i + 1}</span>
+              <span style={{ color: i < 3 ? 'var(--text3)' : 'var(--accent2)', fontWeight: 700, fontSize: 13, width: 20, flexShrink: 0 }}>{i + 1}</span>
               <input
                 value={goal.text}
                 onChange={e => handleGoalChange(i, e.target.value)}
-                placeholder={`Goal ${i + 1} — your ONE Thing for this week`}
-                style={{ flex: 1, textDecoration: goal.done ? 'line-through' : 'none', color: goal.done ? 'var(--text3)' : 'var(--text)' }}
+                placeholder={i < 3 ? `Goal ${i + 1} — your ONE Thing` : `Extra goal ${i + 1} (optional)`}
+                style={{
+                  flex: 1,
+                  textDecoration: goal.done ? 'line-through' : 'none',
+                  color: goal.done ? 'var(--text3)' : 'var(--text)',
+                  borderColor: i >= 3 ? 'rgba(124,106,255,0.3)' : undefined,
+                }}
               />
               {goalsData?.goals?.length > 0 && (
                 <button
@@ -557,18 +627,28 @@ export default function WeeklyView({ plans, loading, getCurrentPlan, savePlan, s
                   title="Link a milestone from Goals"
                   onClick={() => setMilestonePicker(i)}
                   style={{ flexShrink: 0, fontSize: 11, color: goal.milestoneLinked ? 'var(--accent2)' : 'var(--text3)', borderColor: goal.milestoneLinked ? 'var(--accent)' : undefined }}
-                >
-                  🎯
-                </button>
+                >🎯</button>
+              )}
+              {i >= 3 && (
+                <button
+                  onClick={() => removeGoal(i)}
+                  title="Remove this goal"
+                  style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0, opacity: 0.6 }}
+                  onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'var(--text3)'}
+                >×</button>
               )}
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── 7 reflection questions ── */}
+      {/* ── Weekly reflection ── */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-title">Weekly reflection</div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 16, marginTop: -8 }}>
+          Fill this in on Sunday evening as part of your closing ritual — before planning next week
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {REFLECTION_QUESTIONS.map((q, i) => (
             <div key={q.key}>
