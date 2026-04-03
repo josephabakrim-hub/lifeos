@@ -236,11 +236,7 @@ function ReflectionModal({ onClose, onSave, existing, people }) {
 function MyPeople({ people, addPerson, updatePerson, deletePerson, archivePerson, unarchivePerson, markContacted }) {
   const [showModal,    setShowModal]    = useState(false)
   const [editPerson,   setEditPerson]   = useState(null)
-  const [openCats,     setOpenCats]     = useState(() => {
-    // Start with all non-empty categories open
-    const set = new Set(['inner', 'close', 'family'])
-    return set
-  })
+  const [openCats,     setOpenCats]     = useState(() => new Set())
   const [movingId,     setMovingId]     = useState(null) // person id being moved
 
   const today = formatDate()
