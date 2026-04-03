@@ -6,9 +6,18 @@ import {
 import { db } from '../lib/firebase'
 import { formatDate } from '../lib/utils'
 
+// Returns true if a habit is scheduled on the given dateStr
+// scheduledDays is an array of day numbers [0=Sun..6=Sat], default all days if absent
+export function isHabitScheduledOn(habit, dateStr) {
+  const days = habit.scheduledDays
+  if (!days || days.length === 0) return true
+  const dow = new Date(dateStr + 'T12:00:00').getDay()
+  return days.includes(dow)
+}
+
 export function useHabits() {
-  const [habits, setHabits] = useState([])
-  const [logs, setLogs] = useState([])
+  const [habits,  setHabits]  = useState([])
+  const [logs,    setLogs]    = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -29,6 +38,7 @@ export function useHabits() {
   async function addHabit(habit) {
     await addDoc(collection(db, 'lo_habits'), {
       ...habit,
+      scheduledDays: habit.scheduledDays ?? [0, 1, 2, 3, 4, 5, 6],
       createdAt: new Date().toISOString(),
       active: true,
     })
@@ -48,41 +58,52 @@ export function useHabits() {
       await updateDoc(doc(db, 'lo_habit_logs', existing.id), { done: !existing.done })
     } else {
       await addDoc(collection(db, 'lo_habit_logs'), {
-        habitId,
-        date,
-        done: true,
+        habitId, date, done: true,
         createdAt: new Date().toISOString(),
       })
     }
   }
 
+  // Score for today — only counts habits scheduled today
   function getTodayScore() {
-    if (!habits.length) return 0
     const today = formatDate()
-    const activeHabits = habits.filter(h => h.active)
-    if (!activeHabits.length) return 0
-    const done = activeHabits.filter(h =>
+    const activeHabits = habits.filter(h => h.active && !h.mastered)
+    const scheduledToday = activeHabits.filter(h => isHabitScheduledOn(h, today))
+    if (!scheduledToday.length) return 0
+    const done = scheduledToday.filter(h =>
       logs.find(l => l.habitId === h.id && l.date === today && l.done)
     ).length
-    return Math.round((done / activeHabits.length) * 100)
+    return Math.round((done / scheduledToday.length) * 100)
   }
 
+  // Week score — each day only counts habits scheduled that day
   function getWeekScore() {
-    if (!habits.length) return 0
-    const activeHabits = habits.filter(h => h.active)
+    const activeHabits = habits.filter(h => h.active && !h.mastered)
     if (!activeHabits.length) return 0
-    let total = 0
+
+    let totalScore = 0
+    let countedDays = 0
+
     for (let i = 0; i < 7; i++) {
       const d = new Date()
       d.setDate(d.getDate() - i)
       const date = formatDate(d)
-      const done = activeHabits.filter(h =>
+      const scheduledThatDay = activeHabits.filter(h => isHabitScheduledOn(h, date))
+      if (!scheduledThatDay.length) continue
+
+      const done = scheduledThatDay.filter(h =>
         logs.find(l => l.habitId === h.id && l.date === date && l.done)
       ).length
-      total += (done / activeHabits.length) * 100
+      totalScore += (done / scheduledThatDay.length) * 100
+      countedDays++
     }
-    return Math.round(total / 7)
+
+    return countedDays > 0 ? Math.round(totalScore / countedDays) : 0
   }
 
-  return { habits, logs, loading, addHabit, updateHabit, deleteHabit, toggleHabitLog, getTodayScore, getWeekScore }
+  return {
+    habits, logs, loading,
+    addHabit, updateHabit, deleteHabit, toggleHabitLog,
+    getTodayScore, getWeekScore,
+  }
 }
