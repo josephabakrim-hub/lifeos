@@ -1,23 +1,22 @@
 import { useState } from 'react'
-import { useHabits }          from './hooks/useHabits'
-import { useWeekly }          from './hooks/useWeekly'
-import { useFitness }         from './hooks/useFitness'
-import { useMental }          from './hooks/useMental'
-import { useSocial }          from './hooks/useSocial'
-import { useLearn }           from './hooks/useLearn'
-import { useGoals }           from './hooks/useGoals'
-import { useJourney }         from './hooks/useJourney'
-import { useWeeklyHistory }   from './hooks/useWeeklyHistory'
-import { calcLifeScore }      from './lib/idealJoseph'
-import DashboardView          from './views/DashboardView'
-import HabitsView             from './views/HabitsView'
-import WeeklyView             from './views/WeeklyView'
-import FitnessView            from './views/FitnessView'
-import MentalView             from './views/MentalView'
-import SocialView             from './views/SocialView'
-import LearnView              from './views/LearnView'
-import GoalsView              from './views/GoalsView'
-import IdealJosephView        from './views/IdealJosephView'
+import { useHabits }   from './hooks/useHabits'
+import { useWeekly }   from './hooks/useWeekly'
+import { useFitness }  from './hooks/useFitness'
+import { useMental }   from './hooks/useMental'
+import { useSocial }   from './hooks/useSocial'
+import { useLearn }    from './hooks/useLearn'
+import { useGoals }    from './hooks/useGoals'
+import { useJourney }  from './hooks/useJourney'
+import { calcLifeScore } from './lib/idealJoseph'
+import DashboardView   from './views/DashboardView'
+import HabitsView      from './views/HabitsView'
+import WeeklyView      from './views/WeeklyView'
+import FitnessView     from './views/FitnessView'
+import MentalView      from './views/MentalView'
+import SocialView      from './views/SocialView'
+import LearnView       from './views/LearnView'
+import GoalsView       from './views/GoalsView'
+import IdealJosephView from './views/IdealJosephView'
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard',   icon: '⚡' },
@@ -39,6 +38,7 @@ function JourneyStartScreen({ onBegin, onExplore }) {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px', background: 'var(--bg)', textAlign: 'center' }}>
+      {/* Logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 48 }}>
         <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #7c6aff, #c084fc)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 900, color: '#fff', boxShadow: '0 4px 20px rgba(124,106,255,0.4)' }}>L</div>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800 }}>
@@ -46,6 +46,7 @@ function JourneyStartScreen({ onBegin, onExplore }) {
         </div>
       </div>
 
+      {/* Main card */}
       <div style={{ maxWidth: 520, width: '100%' }}>
         <div style={{ fontSize: 42, marginBottom: 16 }}>🌅</div>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, marginBottom: 12, lineHeight: 1.2 }}>
@@ -55,12 +56,14 @@ function JourneyStartScreen({ onBegin, onExplore }) {
           LifeOS tracks your progress against Ideal Joseph — the best version of you. But that comparison only makes sense from the day <em>you</em> choose to begin. There's no pressure. When you're ready, click the button below and today becomes Day 1.
         </p>
 
+        {/* Framework pills */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 40 }}>
-          {['🧠 Atomic Habits', '📅 12 Week Year', '💪 Huberman Lab', '🧘 CBT + ACT', "❤️ Dunbar's Layers", '📚 Ultralearning', '🎯 The ONE Thing'].map(f => (
+          {['🧠 Atomic Habits', '📅 12 Week Year', '💪 Huberman Lab', '🧘 CBT + ACT', '❤️ Dunbar\'s Layers', '📚 Ultralearning', '🎯 The ONE Thing'].map(f => (
             <span key={f} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: 'var(--bg3)', border: '1px solid var(--border2)', color: 'var(--text3)' }}>{f}</span>
           ))}
         </div>
 
+        {/* CTA */}
         {!confirming ? (
           <button
             onClick={() => setConfirming(true)}
@@ -88,6 +91,7 @@ function JourneyStartScreen({ onBegin, onExplore }) {
           </div>
         )}
 
+        {/* Explore link — no commitment, just browse */}
         <div style={{ marginTop: 28 }}>
           <button
             onClick={onExplore}
@@ -139,8 +143,8 @@ function JourneyBanner({ onBegin }) {
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard')
-  const [exploring, setExploring] = useState(false)
+  const [activeTab,  setActiveTab]  = useState('dashboard')
+  const [exploring,  setExploring]  = useState(false) // bypass start screen without committing
 
   const journey     = useJourney()
   const habitsData  = useHabits()
@@ -150,11 +154,6 @@ export default function App() {
   const socialData  = useSocial()
   const learnData   = useLearn()
   const goalsData   = useGoals()
-
-  // Weekly history — derived from all pillar data
-  const weeklyHistory = useWeeklyHistory({
-    habitsData, weeklyData, fitnessData, mentalData, socialData, learnData, goalsData,
-  })
 
   // Scores only count once journey has formally started
   const pillarScores = journey.journeyStarted ? {
@@ -177,6 +176,7 @@ export default function App() {
     )
   }
 
+  // Show start screen only if: journey not started AND not in explore mode
   if (!journey.journeyStarted && !exploring) {
     return (
       <JourneyStartScreen
@@ -257,18 +257,14 @@ export default function App() {
           </>
         )}
         {activeTab === 'habits'  && <HabitsView  {...habitsData} />}
-        {activeTab === 'weekly'  && <WeeklyView  {...weeklyData} goalsData={goalsData} />}
+        {activeTab === 'weekly'  && <WeeklyView  {...weeklyData} activeGoals={goalsData.goals.filter(g => g.status === 'active')} />}
         {activeTab === 'fitness' && <FitnessView {...fitnessData} />}
         {activeTab === 'mental'  && <MentalView  {...mentalData} />}
         {activeTab === 'social'  && <SocialView  {...socialData} />}
         {activeTab === 'learn'   && <LearnView   {...learnData} />}
         {activeTab === 'goals'   && <GoalsView   {...goalsData} />}
         {activeTab === 'ideal'   && (
-          <IdealJosephView
-            pillarScores={pillarScores}
-            lifeScore={lifeScore}
-            weeklyHistory={weeklyHistory}
-          />
+          <IdealJosephView pillarScores={pillarScores} lifeScore={lifeScore} />
         )}
       </main>
     </div>
