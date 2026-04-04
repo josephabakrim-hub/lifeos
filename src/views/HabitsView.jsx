@@ -14,6 +14,8 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const ALL_DAYS   = [0, 1, 2, 3, 4, 5, 6]
 const WEEKDAYS   = [1, 2, 3, 4, 5]
 const WEEKENDS   = [0, 6]
+const ALT_A      = [1, 3, 5]   // Mon, Wed, Fri
+const ALT_B      = [0, 2, 4, 6] // Sun, Tue, Thu, Sat
 
 const LIFE_AREA_PRESETS = [
   {
@@ -76,8 +78,10 @@ function scheduleLabel(days) {
   if (!days || days.length === 7) return 'Every day'
   if (days.length === 0) return 'No days'
   const s = [...days].sort()
-  if (JSON.stringify(s) === JSON.stringify(WEEKDAYS)) return 'Weekdays only'
-  if (JSON.stringify(s) === JSON.stringify([0, 6]))   return 'Weekends only'
+  if (JSON.stringify(s) === JSON.stringify(WEEKDAYS))      return 'Weekdays only'
+  if (JSON.stringify(s) === JSON.stringify([0, 6]))        return 'Weekends only'
+  if (JSON.stringify(s) === JSON.stringify([...ALT_A].sort())) return 'Every other day (Mon/Wed/Fri)'
+  if (JSON.stringify(s) === JSON.stringify([...ALT_B].sort())) return 'Every other day (Tue/Thu/Sat/Sun)'
   return s.map(d => DAY_LABELS[d]).join(', ')
 }
 
@@ -95,10 +99,16 @@ function DaySelector({ value, onChange }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-        {[{ label: 'Every day', days: ALL_DAYS }, { label: 'Weekdays', days: WEEKDAYS }, { label: 'Weekends', days: WEEKENDS }].map(p => {
+        {[
+          { label: 'Every day',          days: ALL_DAYS },
+          { label: 'Weekdays',           days: WEEKDAYS },
+          { label: 'Weekends',           days: WEEKENDS },
+          { label: 'Every other day ①', days: ALT_A,  title: 'Mon, Wed, Fri' },
+          { label: 'Every other day ②', days: ALT_B,  title: 'Tue, Thu, Sat/Sun' },
+        ].map(p => {
           const active = JSON.stringify([...value].sort()) === JSON.stringify([...p.days].sort())
           return (
-            <button key={p.label} type="button" onClick={() => onChange([...p.days])} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`, background: active ? 'var(--accent-glow)' : 'transparent', color: active ? 'var(--accent)' : 'var(--text3)' }}>
+            <button key={p.label} type="button" title={p.title} onClick={() => onChange([...p.days])} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`, background: active ? 'var(--accent-glow)' : 'transparent', color: active ? 'var(--accent)' : 'var(--text3)' }}>
               {p.label}
             </button>
           )
