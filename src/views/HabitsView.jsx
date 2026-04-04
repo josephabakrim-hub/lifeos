@@ -302,6 +302,34 @@ function MasteryModal({ habit, onClose }) {
   )
 }
 
+
+// ─── Delete confirm modal ─────────────────────────────────────────────────────
+
+function DeleteConfirmModal({ habit, onConfirm, onCancel }) {
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+        <div style={{ fontSize: 36, textAlign: 'center', marginBottom: 12 }}>🗑️</div>
+        <div className="modal-title" style={{ textAlign: 'center' }}>Delete this habit?</div>
+        <div style={{ textAlign: 'center', marginBottom: 10 }}>
+          <span style={{ fontSize: 22 }}>{habit.icon}</span>{' '}
+          <strong style={{ fontSize: 15 }}>{habit.name}</strong>
+        </div>
+        <p style={{ fontSize: 13, color: 'var(--red)', textAlign: 'center', lineHeight: 1.6, margin: '0 0 8px', fontWeight: 600 }}>
+          ⚠️ This permanently deletes the habit and all its tracking history.
+        </p>
+        <p style={{ fontSize: 13, color: 'var(--text3)', textAlign: 'center', lineHeight: 1.6, margin: '0 0 24px' }}>
+          If you just want to pause it, use <strong style={{ color: 'var(--text2)' }}>📦 Archive</strong> instead — that keeps your history intact and lets you restore it later.
+        </p>
+        <div className="modal-footer" style={{ justifyContent: 'center', gap: 10 }}>
+          <button className="btn" onClick={onCancel}>Cancel — keep it</button>
+          <button className="btn btn-danger" onClick={onConfirm}>Yes, delete permanently</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Retro log modal ──────────────────────────────────────────────────────────
 
 function RetroLogModal({ dateStr, habits, logs, toggleHabitLog, onClose }) {
@@ -402,6 +430,7 @@ function HabitHeatmap({ habit, logs, rangeDays }) {
 
 function HabitCard({ habit, logs, today, toggleHabitLog, onEdit, onArchive, onDelete, onMastered }) {
   const [rangeDays, setRangeDays] = useState(30)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const isDone           = !!logs.find(l => l.habitId === habit.id && l.date === today && l.done)
   const isScheduledToday = isHabitScheduledOn(habit, today)
   const scheduledDays    = habit.scheduledDays ?? ALL_DAYS
@@ -429,51 +458,60 @@ function HabitCard({ habit, logs, today, toggleHabitLog, onEdit, onArchive, onDe
   }, [stageInfo.mastered])
 
   return (
-    <div className="card" style={{ borderLeft: `3px solid ${habit.color || 'var(--accent)'}`, opacity: isScheduledToday ? 1 : 0.55 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button
-          className={`habit-toggle ${isDone ? 'done' : ''}`}
-          style={{ borderColor: isDone ? habit.color : 'var(--border2)', background: isDone ? habit.color : 'transparent', cursor: isScheduledToday ? 'pointer' : 'not-allowed' }}
-          onClick={() => isScheduledToday && toggleHabitLog(habit.id)}
-          title={isScheduledToday ? undefined : `Not scheduled today — ${scheduleLabel(scheduledDays)}`}
-        >
-          {isDone ? '✓' : ''}
-        </button>
-        <span style={{ fontSize: 24 }}>{habit.icon}</span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: 15, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? 'var(--text3)' : 'var(--text)' }}>{habit.name}</div>
-          {habit.description && <div style={{ fontSize: 12, color: 'var(--text3)' }}>{habit.description}</div>}
-          <div style={{ fontSize: 11, marginTop: 2 }}>
-            <span style={{ color: 'var(--text3)' }}>📅 {scheduleLabel(scheduledDays)}</span>
-            {!isScheduledToday && <span style={{ color: 'var(--amber)', fontWeight: 600, marginLeft: 6 }}>· Off today</span>}
+    <>
+      <div className="card" style={{ borderLeft: `3px solid ${habit.color || 'var(--accent)'}`, opacity: isScheduledToday ? 1 : 0.55 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            className={`habit-toggle ${isDone ? 'done' : ''}`}
+            style={{ borderColor: isDone ? habit.color : 'var(--border2)', background: isDone ? habit.color : 'transparent', cursor: isScheduledToday ? 'pointer' : 'not-allowed' }}
+            onClick={() => isScheduledToday && toggleHabitLog(habit.id)}
+            title={isScheduledToday ? undefined : `Not scheduled today — ${scheduleLabel(scheduledDays)}`}
+          >
+            {isDone ? '✓' : ''}
+          </button>
+          <span style={{ fontSize: 24 }}>{habit.icon}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: 15, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? 'var(--text3)' : 'var(--text)' }}>{habit.name}</div>
+            {habit.description && <div style={{ fontSize: 12, color: 'var(--text3)' }}>{habit.description}</div>}
+            <div style={{ fontSize: 11, marginTop: 2 }}>
+              <span style={{ color: 'var(--text3)' }}>📅 {scheduleLabel(scheduledDays)}</span>
+              {!isScheduledToday && <span style={{ color: 'var(--amber)', fontWeight: 600, marginLeft: 6 }}>· Off today</span>}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {streak > 0 && <span className="streak">🔥 {streak}d</span>}
+            <span className="badge badge-blue">{rate30}% / 30d</span>
+            <button className="btn btn-sm" onClick={onEdit}>✏️</button>
+            <button className="btn btn-sm" onClick={onArchive}>📦</button>
+            <button className="btn btn-sm btn-danger" onClick={() => setConfirmDelete(true)}>✕</button>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {streak > 0 && <span className="streak">🔥 {streak}d</span>}
-          <span className="badge badge-blue">{rate30}% / 30d</span>
-          <button className="btn btn-sm" onClick={onEdit}>✏️</button>
-          <button className="btn btn-sm" onClick={onArchive}>📦</button>
-          <button className="btn btn-sm btn-danger" onClick={onDelete}>✕</button>
-        </div>
-      </div>
 
-      {/* Stage bar */}
-      <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ fontSize: 12, color: stageColor, fontWeight: 700, flexShrink: 0 }}>{STAGE_ICONS[stageInfo.stage]} {stageInfo.label}</span>
-        <div style={{ flex: 1, height: 4, background: 'var(--bg4)', borderRadius: 2 }}>
-          <div style={{ height: '100%', borderRadius: 2, background: stageColor, width: `${stageInfo.stagePct}%`, transition: 'width 0.6s ease' }} />
+        {/* Stage bar */}
+        <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 12, color: stageColor, fontWeight: 700, flexShrink: 0 }}>{STAGE_ICONS[stageInfo.stage]} {stageInfo.label}</span>
+          <div style={{ flex: 1, height: 4, background: 'var(--bg4)', borderRadius: 2 }}>
+            <div style={{ height: '100%', borderRadius: 2, background: stageColor, width: `${stageInfo.stagePct}%`, transition: 'width 0.6s ease' }} />
+          </div>
+          <span style={{ fontSize: 11, color: 'var(--text3)', flexShrink: 0 }}>Day {stageInfo.day}/{stageGoal}</span>
         </div>
-        <span style={{ fontSize: 11, color: 'var(--text3)', flexShrink: 0 }}>Day {stageInfo.day}/{stageGoal}</span>
-      </div>
 
-      {/* Heatmap */}
-      <div style={{ marginTop: 10, display: 'flex', gap: 4 }}>
-        {HEATMAP_RANGES.map(r => (
-          <button key={r.label} onClick={() => setRangeDays(r.days)} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${rangeDays === r.days ? 'var(--accent)' : 'var(--border)'}`, background: rangeDays === r.days ? 'var(--accent-glow)' : 'transparent', color: rangeDays === r.days ? 'var(--accent)' : 'var(--text3)' }}>{r.label}</button>
-        ))}
+        {/* Heatmap */}
+        <div style={{ marginTop: 10, display: 'flex', gap: 4 }}>
+          {HEATMAP_RANGES.map(r => (
+            <button key={r.label} onClick={() => setRangeDays(r.days)} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${rangeDays === r.days ? 'var(--accent)' : 'var(--border)'}`, background: rangeDays === r.days ? 'var(--accent-glow)' : 'transparent', color: rangeDays === r.days ? 'var(--accent)' : 'var(--text3)' }}>{r.label}</button>
+          ))}
+        </div>
+        <HabitHeatmap habit={habit} logs={logs} rangeDays={rangeDays} />
       </div>
-      <HabitHeatmap habit={habit} logs={logs} rangeDays={rangeDays} />
-    </div>
+      {confirmDelete && (
+        <DeleteConfirmModal
+          habit={habit}
+          onConfirm={() => { setConfirmDelete(false); onDelete() }}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
+    </>
   )
 }
 
@@ -483,31 +521,41 @@ function StatRow({ s, onEdit, onArchive, onUnarchive, onDelete }) {
   const { habit, stageInfo, allTimeRate, longestStreak, currentStreak, totalDays } = s
   const stageColor = STAGE_COLORS[stageInfo.stage]
   const isArchived = !habit.active && !habit.mastered
+  const [confirmDelete, setConfirmDelete] = useState(false)
   return (
-    <div className="card" style={{ marginBottom: 10, borderLeft: `3px solid ${habit.color || 'var(--accent)'}` }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ fontSize: 22 }}>{habit.icon}</span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{habit.name}</div>
-          <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text3)', flexWrap: 'wrap' }}>
-            <span style={{ color: stageColor, fontWeight: 700 }}>{STAGE_ICONS[stageInfo.stage]} {stageInfo.label}</span>
-            <span>🔥 Best: {longestStreak}d</span>
-            <span>⚡ Now: {currentStreak}d</span>
-            <span>📅 Total: {totalDays}</span>
-            <span>📊 Rate: {allTimeRate}%</span>
-            <span style={{ color: 'var(--accent)' }}>🗓 {scheduleLabel(habit.scheduledDays ?? ALL_DAYS)}</span>
+    <>
+      <div className="card" style={{ marginBottom: 10, borderLeft: `3px solid ${habit.color || 'var(--accent)'}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 22 }}>{habit.icon}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{habit.name}</div>
+            <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text3)', flexWrap: 'wrap' }}>
+              <span style={{ color: stageColor, fontWeight: 700 }}>{STAGE_ICONS[stageInfo.stage]} {stageInfo.label}</span>
+              <span>🔥 Best: {longestStreak}d</span>
+              <span>⚡ Now: {currentStreak}d</span>
+              <span>📅 Total: {totalDays}</span>
+              <span>📊 Rate: {allTimeRate}%</span>
+              <span style={{ color: 'var(--accent)' }}>🗓 {scheduleLabel(habit.scheduledDays ?? ALL_DAYS)}</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn btn-sm" onClick={onEdit}>✏️</button>
+            {isArchived
+              ? <button className="btn btn-sm" style={{ color: 'var(--green)', borderColor: 'var(--green)' }} onClick={onUnarchive}>♻️</button>
+              : <button className="btn btn-sm" style={{ color: 'var(--amber)', borderColor: 'var(--amber)' }} onClick={onArchive}>📦</button>
+            }
+            <button className="btn btn-sm btn-danger" onClick={() => setConfirmDelete(true)}>✕</button>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button className="btn btn-sm" onClick={onEdit}>✏️</button>
-          {isArchived
-            ? <button className="btn btn-sm" style={{ color: 'var(--green)', borderColor: 'var(--green)' }} onClick={onUnarchive}>♻️</button>
-            : <button className="btn btn-sm" style={{ color: 'var(--amber)', borderColor: 'var(--amber)' }} onClick={onArchive}>📦</button>
-          }
-          <button className="btn btn-sm btn-danger" onClick={onDelete}>✕</button>
-        </div>
       </div>
-    </div>
+      {confirmDelete && (
+        <DeleteConfirmModal
+          habit={habit}
+          onConfirm={() => { setConfirmDelete(false); onDelete() }}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
+    </>
   )
 }
 
