@@ -18,11 +18,11 @@ const TOPIC_COLORS = {
 }
 
 const RECALL_LABELS = {
-  1: { label: 'Blank', sub: 'Couldn\'t recall anything', color: '#ef4444' },
-  2: { label: 'Weak',  sub: 'Recalled very little',      color: '#f97316' },
-  3: { label: 'Okay',  sub: 'Got the gist, gaps remain', color: '#f59e0b' },
-  4: { label: 'Good',  sub: 'Recalled most of it',       color: '#22c55e' },
-  5: { label: 'Perfect', sub: 'Clear and complete recall', color: '#a855f7' },
+  1: { label: 'Blank',   sub: "Couldn't recall anything",  color: '#ef4444' },
+  2: { label: 'Weak',    sub: 'Recalled very little',       color: '#f97316' },
+  3: { label: 'Okay',    sub: 'Got the gist, gaps remain',  color: '#f59e0b' },
+  4: { label: 'Good',    sub: 'Recalled most of it',        color: '#22c55e' },
+  5: { label: 'Perfect', sub: 'Clear and complete recall',  color: '#a855f7' },
 }
 
 function typeIcon(value) {
@@ -215,6 +215,46 @@ function RecallModal({ item, onClose, onSave }) {
   )
 }
 
+// ─── Cancel / postpone recall modal ──────────────────────────────────────────
+
+function CancelRecallModal({ item, onClose, onCancel }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+        <div className="modal-title">⏭️ Manage recall schedule</div>
+        <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20, lineHeight: 1.6 }}>
+          <strong style={{ color: 'var(--text)' }}>{item.title}</strong> is scheduled for recall
+          {item.nextReviewDate ? ` on ${item.nextReviewDate}` : ''}. What would you like to do?
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+          {[
+            { label: '⏭️ Postpone 3 days',  days: 3  },
+            { label: '⏭️ Postpone 7 days',  days: 7  },
+            { label: '⏭️ Postpone 14 days', days: 14 },
+            { label: '🗑️ Remove recall schedule entirely', days: 0 },
+          ].map(opt => (
+            <button
+              key={opt.days}
+              className="btn"
+              onClick={() => { onCancel(item.id, opt.days); onClose() }}
+              style={{
+                justifyContent: 'flex-start',
+                color: opt.days === 0 ? 'var(--red)' : 'var(--text)',
+                borderColor: opt.days === 0 ? 'var(--red)' : 'var(--border2)',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <div className="modal-footer">
+          <button className="btn" onClick={onClose}>Keep as scheduled</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Full takeaways modal ─────────────────────────────────────────────────────
 
 function TakeawaysModal({ item, onClose }) {
@@ -248,17 +288,19 @@ function TakeawaysModal({ item, onClose }) {
 
 // ─── Learning card ────────────────────────────────────────────────────────────
 
-function LearningCard({ item, onEdit, onDelete, onReview }) {
-  const [expanded,     setExpanded]     = useState(false)
-  const [showAllModal, setShowAllModal] = useState(false)
-  const [showRecall,   setShowRecall]   = useState(false)
-  const color       = topicColor(item.topic)
+function LearningCard({ item, onEdit, onDelete, onReview, onCancelReview }) {
+  const [expanded,      setExpanded]      = useState(false)
+  const [showAllModal,  setShowAllModal]  = useState(false)
+  const [showRecall,    setShowRecall]    = useState(false)
+  const [showCancel,    setShowCancel]    = useState(false)
+  const color        = topicColor(item.topic)
   const hasMoreThan2 = item.takeaways?.length > 2
-  const daysLeft    = daysUntilReview(item.nextReviewDate)
-  const isDue       = daysLeft !== null && daysLeft <= 0
-  const isDueSoon   = daysLeft !== null && daysLeft > 0 && daysLeft <= 2
-  const lastRecall  = item.lastRecallRating ? RECALL_LABELS[item.lastRecallRating] : null
-  const reviewCount = item.reviewHistory?.length || 0
+  const daysLeft     = daysUntilReview(item.nextReviewDate)
+  const isDue        = daysLeft !== null && daysLeft <= 0
+  const isDueSoon    = daysLeft !== null && daysLeft > 0 && daysLeft <= 2
+  const isFuture     = daysLeft !== null && daysLeft > 2
+  const lastRecall   = item.lastRecallRating ? RECALL_LABELS[item.lastRecallRating] : null
+  const reviewCount  = item.reviewHistory?.length || 0
 
   return (
     <>
@@ -278,6 +320,11 @@ function LearningCard({ item, onEdit, onDelete, onReview }) {
               {isDueSoon && !isDue && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 20, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 11, color: '#f59e0b' }}>
                   🔁 Due in {daysLeft}d
+                </span>
+              )}
+              {isFuture && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 20, background: 'var(--bg3)', border: '1px solid var(--border2)', fontSize: 11, color: 'var(--text3)' }}>
+                  🗓 Review in {daysLeft}d
                 </span>
               )}
             </div>
@@ -345,19 +392,36 @@ function LearningCard({ item, onEdit, onDelete, onReview }) {
             >
               🔁 {isDue ? 'Review now' : 'Recall check'}
             </button>
+            {/* Cancel / postpone — only shown if a review is scheduled */}
+            {item.nextReviewDate && onCancelReview && (
+              <button
+                onClick={() => setShowCancel(true)}
+                title="Postpone or cancel recall schedule"
+                style={{
+                  padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                  border: '1px solid var(--border2)',
+                  background: 'var(--bg3)',
+                  color: 'var(--text3)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                ⏭️ Manage schedule
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {showAllModal && <TakeawaysModal item={item} onClose={() => setShowAllModal(false)} />}
       {showRecall   && <RecallModal item={item} onClose={() => setShowRecall(false)} onSave={rating => onReview(item.id, rating)} />}
+      {showCancel   && <CancelRecallModal item={item} onClose={() => setShowCancel(false)} onCancel={onCancelReview} />}
     </>
   )
 }
 
 // ─── Topic group ──────────────────────────────────────────────────────────────
 
-function TopicGroup({ topic, items, onEdit, onDelete, onReview }) {
+function TopicGroup({ topic, items, onEdit, onDelete, onReview, onCancelReview }) {
   const [collapsed, setCollapsed] = useState(false)
   const color      = topicColor(topic)
   const totalHours = items.reduce((acc, i) => acc + (i.duration || 0), 0)
@@ -378,7 +442,12 @@ function TopicGroup({ topic, items, onEdit, onDelete, onReview }) {
       {!collapsed && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {items.map(item => (
-            <LearningCard key={item.id} item={item} onEdit={() => onEdit(item)} onDelete={() => onDelete(item.id)} onReview={onReview} />
+            <LearningCard key={item.id} item={item}
+              onEdit={() => onEdit(item)}
+              onDelete={() => onDelete(item.id)}
+              onReview={onReview}
+              onCancelReview={onCancelReview}
+            />
           ))}
         </div>
       )}
@@ -388,7 +457,7 @@ function TopicGroup({ topic, items, onEdit, onDelete, onReview }) {
 
 // ─── Due for review panel ─────────────────────────────────────────────────────
 
-function ReviewTab({ dueItems, onReview, onEdit }) {
+function ReviewTab({ dueItems, onReview, onEdit, onCancelReview }) {
   if (dueItems.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '48px 24px' }}>
@@ -409,7 +478,7 @@ function ReviewTab({ dueItems, onReview, onEdit }) {
           🔁 {dueItems.length} session{dueItems.length !== 1 ? 's' : ''} due for recall today
         </div>
         <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.6 }}>
-          Close your notes and try to recall what you learned. Rate your recall honestly — that's what drives the spacing. Good recall = longer interval. Weak recall = sooner.
+          Close your notes and try to recall what you learned. Rate your recall honestly — that's what drives the spacing. Not ready? Use "Manage schedule" on any card to postpone or remove it.
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -420,6 +489,7 @@ function ReviewTab({ dueItems, onReview, onEdit }) {
             onEdit={() => onEdit(item)}
             onDelete={() => {}}
             onReview={onReview}
+            onCancelReview={onCancelReview}
           />
         ))}
       </div>
@@ -429,7 +499,7 @@ function ReviewTab({ dueItems, onReview, onEdit }) {
 
 // ─── Calendar history ─────────────────────────────────────────────────────────
 
-function LearnHistory({ learnings, onEdit, onDelete, onReview }) {
+function LearnHistory({ learnings, onEdit, onDelete, onReview, onCancelReview }) {
   const now = new Date()
   const [year,     setYear]     = useState(now.getFullYear())
   const [month,    setMonth]    = useState(now.getMonth())
@@ -537,25 +607,26 @@ function LearnHistory({ learnings, onEdit, onDelete, onReview }) {
 
 // ─── Main view ────────────────────────────────────────────────────────────────
 
-export default function LearnView({ learnings, loading, addLearning, updateLearning, deleteLearning, recordReview, getWeekLearnings, getDueForReview, getWeekScore, getTopicBreakdown }) {
-  const [showModal,    setShowModal]    = useState(false)
-  const [editItem,     setEditItem]     = useState(null)
-  const [innerTab,     setInnerTab]     = useState('week')
-  const [sortBy,       setSortBy]       = useState('date')
-  const [filterTopic,  setFilterTopic]  = useState('All')
+export default function LearnView({
+  learnings, loading,
+  addLearning, updateLearning, deleteLearning,
+  recordReview, cancelReview,
+  getWeekLearnings, getDueForReview, getWeekScore, getWeekReviewCount, getTopicBreakdown,
+}) {
+  const [showModal,   setShowModal]   = useState(false)
+  const [editItem,    setEditItem]    = useState(null)
+  const [innerTab,    setInnerTab]    = useState('week')
+  const [sortBy,      setSortBy]      = useState('date')
+  const [filterTopic, setFilterTopic] = useState('All')
 
-  const weekItems   = getWeekLearnings()
-  const weekScore   = getWeekScore()
-  const weekHours   = weekItems.reduce((acc, l) => acc + (l.duration || 0), 0)
-  const dueItems    = getDueForReview ? getDueForReview() : []
-  const dueCount    = dueItems.length
+  const weekItems  = getWeekLearnings()
+  const weekScore  = getWeekScore()
+  const weekHours  = weekItems.reduce((acc, l) => acc + (l.duration || 0), 0)
+  const dueItems   = getDueForReview ? getDueForReview() : []
+  const dueCount   = dueItems.length
 
-  // Reviews done this week
-  const today     = formatDate()
-  const weekStart = getWeekStart()
-  const weekReviewCount = learnings.filter(l =>
-    l.lastReviewDate && l.lastReviewDate >= weekStart && l.lastReviewDate <= today
-  ).length
+  // Accurate count — uses reviewHistory entries this week only, not lastReviewDate
+  const weekReviewCount = getWeekReviewCount ? getWeekReviewCount() : 0
 
   const allSessions = useMemo(() => {
     let items = [...learnings]
@@ -563,7 +634,7 @@ export default function LearnView({ learnings, loading, addLearning, updateLearn
     if (sortBy === 'date')  items.sort((a, b) => b.date.localeCompare(a.date))
     if (sortBy === 'hours') items.sort((a, b) => (b.duration || 0) - (a.duration || 0))
     if (sortBy === 'due')   items.sort((a, b) => {
-      const da = daysUntilReview(a.nextReviewDate) ?? 999
+      const da  = daysUntilReview(a.nextReviewDate) ?? 999
       const db2 = daysUntilReview(b.nextReviewDate) ?? 999
       return da - db2
     })
@@ -663,6 +734,7 @@ export default function LearnView({ learnings, loading, addLearning, updateLearn
                   onEdit={() => { setEditItem(item); setShowModal(true) }}
                   onDelete={() => deleteLearning(item.id)}
                   onReview={recordReview}
+                  onCancelReview={cancelReview}
                 />
               ))}
             </div>
@@ -676,6 +748,7 @@ export default function LearnView({ learnings, loading, addLearning, updateLearn
           dueItems={dueItems}
           onReview={recordReview}
           onEdit={item => { setEditItem(item); setShowModal(true) }}
+          onCancelReview={cancelReview}
         />
       )}
 
@@ -708,6 +781,7 @@ export default function LearnView({ learnings, loading, addLearning, updateLearn
                 onEdit={item => { setEditItem(item); setShowModal(true) }}
                 onDelete={deleteLearning}
                 onReview={recordReview}
+                onCancelReview={cancelReview}
               />
             ))
           ) : (
@@ -717,6 +791,7 @@ export default function LearnView({ learnings, loading, addLearning, updateLearn
                   onEdit={() => { setEditItem(item); setShowModal(true) }}
                   onDelete={() => deleteLearning(item.id)}
                   onReview={recordReview}
+                  onCancelReview={cancelReview}
                 />
               ))}
             </div>
@@ -730,6 +805,7 @@ export default function LearnView({ learnings, loading, addLearning, updateLearn
           onEdit={item => { setEditItem(item); setShowModal(true) }}
           onDelete={deleteLearning}
           onReview={recordReview}
+          onCancelReview={cancelReview}
         />
       )}
 
