@@ -18,6 +18,8 @@ export function useGoals() {
     return unsub
   }, [])
 
+  // ── Goal CRUD ────────────────────────────────────────────────────────────────
+
   async function addGoal(goal) {
     await addDoc(collection(db, 'lo_goals'), {
       ...goal,
@@ -36,6 +38,8 @@ export function useGoals() {
     await deleteDoc(doc(db, 'lo_goals', id))
   }
 
+  // ── Milestones ───────────────────────────────────────────────────────────────
+
   async function toggleMilestone(goalId, milestoneIndex) {
     const goal = goals.find(g => g.id === goalId)
     if (!goal) return
@@ -45,13 +49,12 @@ export function useGoals() {
       done: !milestones[milestoneIndex].done,
       completedAt: !milestones[milestoneIndex].done ? formatDate() : null,
     }
-    const progress = calcProgressFromMilestones(milestones)
+    const progress = calcProgress(milestones)
     await updateDoc(doc(db, 'lo_goals', goalId), { milestones, progress, updatedAt: new Date().toISOString() })
   }
 
-  // ── Task operations ──────────────────────────────────────────────────────────
+  // ── Tasks ────────────────────────────────────────────────────────────────────
 
-  // Add a task to a specific milestone
   async function addTask(goalId, milestoneIndex, task) {
     const goal = goals.find(g => g.id === goalId)
     if (!goal) return
@@ -59,18 +62,19 @@ export function useGoals() {
     const tasks = [...(milestones[milestoneIndex].tasks || [])]
     tasks.push({
       id: Date.now().toString(),
-      text: task.text,
-      intention: task.intention || '', // "When X, I will Y" — implementation intention
-      isNextAction: false,
-      done: false,
-      createdAt: new Date().toISOString(),
+      text:          task.text,
+      intention:     task.intention     || '',   // "When X, I will Y" — implementation intention
+      envCue:        task.envCue        || '',   // where will you see the reminder?
+      twoMinVersion: task.twoMinVersion || '',   // 2-minute starter to beat resistance
+      isNextAction:  false,
+      done:          false,
+      createdAt:     new Date().toISOString(),
     })
     milestones[milestoneIndex] = { ...milestones[milestoneIndex], tasks }
-    const progress = calcProgressFromMilestones(milestones)
+    const progress = calcProgress(milestones)
     await updateDoc(doc(db, 'lo_goals', goalId), { milestones, progress, updatedAt: new Date().toISOString() })
   }
 
-  // Toggle a task done/undone — also auto-checks milestone if all tasks done
   async function toggleTask(goalId, milestoneIndex, taskId) {
     const goal = goals.find(g => g.id === goalId)
     if (!goal) return
@@ -80,7 +84,7 @@ export function useGoals() {
         ? { ...t, done: !t.done, completedAt: !t.done ? formatDate() : null }
         : t
     )
-    // Auto-complete milestone when all tasks are done
+    // Auto-complete milestone when all tasks done
     const allDone = tasks.length > 0 && tasks.every(t => t.done)
     milestones[milestoneIndex] = {
       ...milestones[milestoneIndex],
@@ -88,22 +92,21 @@ export function useGoals() {
       done: allDone || milestones[milestoneIndex].done,
       completedAt: allDone && !milestones[milestoneIndex].done ? formatDate() : milestones[milestoneIndex].completedAt,
     }
-    const progress = calcProgressFromMilestones(milestones)
+    const progress = calcProgress(milestones)
     await updateDoc(doc(db, 'lo_goals', goalId), { milestones, progress, updatedAt: new Date().toISOString() })
   }
 
-  // Delete a task
   async function deleteTask(goalId, milestoneIndex, taskId) {
     const goal = goals.find(g => g.id === goalId)
     if (!goal) return
     const milestones = [...(goal.milestones || [])]
     const tasks = (milestones[milestoneIndex].tasks || []).filter(t => t.id !== taskId)
     milestones[milestoneIndex] = { ...milestones[milestoneIndex], tasks }
-    const progress = calcProgressFromMilestones(milestones)
+    const progress = calcProgress(milestones)
     await updateDoc(doc(db, 'lo_goals', goalId), { milestones, progress, updatedAt: new Date().toISOString() })
   }
 
-  // Set ONE next action — clears all others for this goal first
+  // Set ⚡ next action — only one per goal at a time
   async function setNextAction(goalId, milestoneIndex, taskId) {
     const goal = goals.find(g => g.id === goalId)
     if (!goal) return
@@ -117,7 +120,7 @@ export function useGoals() {
     await updateDoc(doc(db, 'lo_goals', goalId), { milestones, updatedAt: new Date().toISOString() })
   }
 
-  // ── Legacy ONE Thing ─────────────────────────────────────────────────────────
+  // ── ONE Thing (legacy, kept) ─────────────────────────────────────────────────
 
   async function logDailyOneThing(goalId, text) {
     const goal = goals.find(g => g.id === goalId)
@@ -131,52 +134,44 @@ export function useGoals() {
 
   function getWeekScore() {
     if (!goals.length) return 0
-    const activeGoals = goals.filter(g => g.status === 'active')
-    if (!activeGoals.length) return 0
+    const active = goals.filter(g => g.status === 'active')
+    if (!active.length) return 0
 
-    const avgProgress = activeGoals.reduce((acc, g) => acc + (g.progress || 0), 0) / activeGoals.length
+    const avgProgress = active.reduce((acc, g) => acc + (g.progress || 0), 0) / active.length
 
-    // Factor in task completion rate across all goals
-    const allTasks = activeGoals.flatMap(g =>
-      (g.milestones || []).flatMap(m => m.tasks || [])
-    )
+    const allTasks = active.flatMap(g => (g.milestones || []).flatMap(m => m.tasks || []))
     const taskCompletionRate = allTasks.length > 0
       ? (allTasks.filter(t => t.done).length / allTasks.length) * 100
       : 0
 
-    // Factor in whether any next actions are set (good planning signal)
-    const hasNextActions = activeGoals.some(g =>
-      (g.milestones || []).some(m => (m.tasks || []).some(t => t.isNextAction && !t.done))
-    )
-    const planningBonus = hasNextActions ? 5 : 0
+    // Planning quality signals
+    const hasNextActions = active.some(g => (g.milestones || []).some(m => (m.tasks || []).some(t => t.isNextAction && !t.done)))
+    const wOOPCount = active.filter(g => g.woop?.wish).length
+    const planningBonus = (hasNextActions ? 4 : 0) + Math.min(6, wOOPCount * 2)
 
-    const onTrack = activeGoals.filter(g => (g.progress || 0) >= 50).length
-    const onTrackRate = (onTrack / activeGoals.length) * 100
+    const onTrack = active.filter(g => (g.progress || 0) >= 50).length
+    const onTrackRate = (onTrack / active.length) * 100
 
-    // Blend: progress 40% + on-track 30% + task completion 25% + planning bonus 5%
     const base = allTasks.length > 0
-      ? Math.round(avgProgress * 0.40 + onTrackRate * 0.30 + taskCompletionRate * 0.25 + planningBonus)
-      : Math.round(avgProgress * 0.5 + onTrackRate * 0.5)
+      ? avgProgress * 0.38 + onTrackRate * 0.28 + taskCompletionRate * 0.24 + planningBonus
+      : avgProgress * 0.5 + onTrackRate * 0.5
 
-    return Math.min(100, base)
+    return Math.min(100, Math.round(base))
   }
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
+  // ── Derived helpers ──────────────────────────────────────────────────────────
 
-  // Progress = blend of milestone completion + task completion
-  function calcProgressFromMilestones(milestones) {
+  // Progress = milestone completion (60%) + task completion (40%)
+  function calcProgress(milestones) {
     if (!milestones.length) return 0
-    const milestoneScore = milestones.filter(m => m.done).length / milestones.length
-
+    const mScore = milestones.filter(m => m.done).length / milestones.length
     const allTasks = milestones.flatMap(m => m.tasks || [])
-    if (!allTasks.length) return Math.round(milestoneScore * 100)
-
-    const taskScore = allTasks.filter(t => t.done).length / allTasks.length
-    // Weight: milestones 60%, tasks 40%
-    return Math.round((milestoneScore * 0.6 + taskScore * 0.4) * 100)
+    if (!allTasks.length) return Math.round(mScore * 100)
+    const tScore = allTasks.filter(t => t.done).length / allTasks.length
+    return Math.round((mScore * 0.6 + tScore * 0.4) * 100)
   }
 
-  // Get all next actions across all goals — for Focus Mode
+  // Get all ⚡ next actions across all active goals — for Focus Mode
   function getNextActions() {
     return goals
       .filter(g => g.status === 'active')
@@ -186,21 +181,27 @@ export function useGoals() {
             .filter(t => t.isNextAction && !t.done)
             .map(t => ({
               ...t,
-              goalId: g.id,
-              goalTitle: g.title,
-              goalCategory: g.category,
+              goalId:        g.id,
+              goalTitle:     g.title,
+              goalCategory:  g.category,
               milestoneIndex: mi,
-              milestoneText: m.text,
+              milestoneText:  m.text,
             }))
         )
       )
   }
 
   return {
-    goals, loading,
-    addGoal, updateGoal, deleteGoal,
+    goals,
+    loading,
+    addGoal,
+    updateGoal,
+    deleteGoal,
     toggleMilestone,
-    addTask, toggleTask, deleteTask, setNextAction,
+    addTask,
+    toggleTask,
+    deleteTask,
+    setNextAction,
     logDailyOneThing,
     getWeekScore,
     getNextActions,
