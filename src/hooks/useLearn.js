@@ -84,9 +84,11 @@ export function useLearn() {
     })
   }
 
+  // Only sessions logged within the current Mon–Sun week, up to today
   function getWeekLearnings() {
     const weekStart = getWeekStart()
-    return learnings.filter(l => l.date >= weekStart)
+    const today = formatDate()
+    return learnings.filter(l => l.date >= weekStart && l.date <= today)
   }
 
   // Items whose nextReviewDate is today or overdue
@@ -96,23 +98,24 @@ export function useLearn() {
   }
 
   function getWeekScore() {
-    const weekItems  = getWeekLearnings()
-    const today      = formatDate()
     const weekStart  = getWeekStart()
+    const today      = formatDate()
+    const weekItems  = getWeekLearnings()
+
+    // Return 0 immediately if nothing logged or reviewed this week
+    const weekReviews = learnings.flatMap(l =>
+      (l.reviewHistory || []).filter(r => r.date >= weekStart && r.date <= today)
+    )
+    if (!weekItems.length && !weekReviews.length) return 0
 
     const hoursLogged = weekItems.reduce((acc, l) => acc + (l.duration || 0), 0)
     const notesCount  = weekItems.filter(l => l.takeaways?.length > 0).length
     const applied     = weekItems.filter(l => l.applied).length
 
-    // Count reviews completed this week (any learning reviewed in this week window)
-    const reviewsDoneThisWeek = learnings.filter(l =>
-      l.lastReviewDate && l.lastReviewDate >= weekStart && l.lastReviewDate <= today
-    ).length
+    // Only count reviews that happened strictly within this week window
+    const reviewsDoneThisWeek = weekReviews.length
 
-    // Avg recall rating of reviews done this week
-    const weekReviews = learnings.flatMap(l =>
-      (l.reviewHistory || []).filter(r => r.date >= weekStart && r.date <= today)
-    )
+    // Avg recall — only meaningful if reviews actually happened this week
     const avgRecall = weekReviews.length
       ? weekReviews.reduce((s, r) => s + r.recallRating, 0) / weekReviews.length
       : 0
@@ -120,10 +123,13 @@ export function useLearn() {
     const hoursScore   = Math.min(100, (hoursLogged / 7) * 100)
     const notesScore   = Math.min(100, (notesCount / 7) * 100)
     const appliedScore = applied > 0 ? 100 : 0
-    // Reviews: up to 100 if ≥3 reviews done with good recall (≥3/5)
-    const reviewScore  = Math.min(100, (reviewsDoneThisWeek / 3) * 100) * (avgRecall >= 3 ? 1 : 0.5)
 
-    // Rebalanced: hours 35%, notes 20%, applied 15%, reviews 30%
+    // reviewScore is 0 if no reviews done this week — avgRecall=0 kills it entirely
+    const reviewScore = reviewsDoneThisWeek === 0
+      ? 0
+      : Math.min(100, (reviewsDoneThisWeek / 3) * 100) * (avgRecall >= 3 ? 1 : 0.5)
+
+    // hours 35%, notes 20%, applied 15%, reviews 30%
     return Math.round(
       hoursScore   * 0.35 +
       notesScore   * 0.20 +
