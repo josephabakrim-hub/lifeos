@@ -3,9 +3,29 @@ import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, order
 import { db } from '../lib/firebase'
 import { formatDate, getWeekStart } from '../lib/utils'
 
+// Spaced repetition intervals in days based on recall rating 1–5
+// Lower recall → shorter interval (review sooner), higher → longer
+function nextInterval(currentInterval, recallRating) {
+  if (recallRating <= 1) return 1          // Blanked — review tomorrow
+  if (recallRating === 2) return 3         // Weak — review in 3 days
+  if (recallRating === 3) return Math.max(3, Math.round(currentInterval * 1.2))  // Okay
+  if (recallRating === 4) return Math.round(currentInterval * 2)                  // Good
+  return Math.round(currentInterval * 2.5) // Perfect — space it out
+}
+
+// Compute next review date string from today + interval days
+function addDays(dateStr, days) {
+  const d = new Date(dateStr + 'T12:00:00')
+  d.setDate(d.getDate() + days)
+  return d.toISOString().split('T')[0]
+}
+
+// Initial interval after first log: 3 days
+const INITIAL_INTERVAL = 3
+
 export function useLearn() {
   const [learnings, setLearnings] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading]     = useState(true)
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -19,9 +39,14 @@ export function useLearn() {
   }, [])
 
   async function addLearning(item) {
+    const today = item.date || formatDate()
     await addDoc(collection(db, 'lo_learnings'), {
       ...item,
-      date: item.date || formatDate(),
+      date: today,
+      // Auto-schedule first review 3 days from now
+      nextReviewDate: addDays(today, INITIAL_INTERVAL),
+      currentInterval: INITIAL_INTERVAL,
+      reviewHistory: [],
       createdAt: new Date().toISOString(),
     })
   }
@@ -34,20 +59,77 @@ export function useLearn() {
     await deleteDoc(doc(db, 'lo_learnings', id))
   }
 
+  // Called when user does a spaced repetition review with a recall rating 1–5
+  async function recordReview(id, recallRating) {
+    const item = learnings.find(l => l.id === id)
+    if (!item) return
+    const today           = formatDate()
+    const currentInterval = item.currentInterval || INITIAL_INTERVAL
+    const newInterval     = nextInterval(currentInterval, recallRating)
+    const newNextReview   = addDays(today, newInterval)
+
+    const reviewEntry = {
+      date: today,
+      recallRating,
+      intervalDays: newInterval,
+    }
+
+    await updateDoc(doc(db, 'lo_learnings', id), {
+      nextReviewDate:   newNextReview,
+      currentInterval:  newInterval,
+      lastReviewDate:   today,
+      lastRecallRating: recallRating,
+      reviewHistory: [...(item.reviewHistory || []), reviewEntry],
+      updatedAt: new Date().toISOString(),
+    })
+  }
+
   function getWeekLearnings() {
     const weekStart = getWeekStart()
     return learnings.filter(l => l.date >= weekStart)
   }
 
+  // Items whose nextReviewDate is today or overdue
+  function getDueForReview() {
+    const today = formatDate()
+    return learnings.filter(l => l.nextReviewDate && l.nextReviewDate <= today)
+  }
+
   function getWeekScore() {
-    const weekItems = getWeekLearnings()
+    const weekItems  = getWeekLearnings()
+    const today      = formatDate()
+    const weekStart  = getWeekStart()
+
     const hoursLogged = weekItems.reduce((acc, l) => acc + (l.duration || 0), 0)
-    const notesCount = weekItems.filter(l => l.takeaways?.length > 0).length
-    const applied = weekItems.filter(l => l.applied).length
-    const hoursScore = Math.min(100, (hoursLogged / 7) * 100)
-    const notesScore = Math.min(100, (notesCount / 7) * 100)
+    const notesCount  = weekItems.filter(l => l.takeaways?.length > 0).length
+    const applied     = weekItems.filter(l => l.applied).length
+
+    // Count reviews completed this week (any learning reviewed in this week window)
+    const reviewsDoneThisWeek = learnings.filter(l =>
+      l.lastReviewDate && l.lastReviewDate >= weekStart && l.lastReviewDate <= today
+    ).length
+
+    // Avg recall rating of reviews done this week
+    const weekReviews = learnings.flatMap(l =>
+      (l.reviewHistory || []).filter(r => r.date >= weekStart && r.date <= today)
+    )
+    const avgRecall = weekReviews.length
+      ? weekReviews.reduce((s, r) => s + r.recallRating, 0) / weekReviews.length
+      : 0
+
+    const hoursScore   = Math.min(100, (hoursLogged / 7) * 100)
+    const notesScore   = Math.min(100, (notesCount / 7) * 100)
     const appliedScore = applied > 0 ? 100 : 0
-    return Math.round(hoursScore * 0.5 + notesScore * 0.3 + appliedScore * 0.2)
+    // Reviews: up to 100 if ≥3 reviews done with good recall (≥3/5)
+    const reviewScore  = Math.min(100, (reviewsDoneThisWeek / 3) * 100) * (avgRecall >= 3 ? 1 : 0.5)
+
+    // Rebalanced: hours 35%, notes 20%, applied 15%, reviews 30%
+    return Math.round(
+      hoursScore   * 0.35 +
+      notesScore   * 0.20 +
+      appliedScore * 0.15 +
+      reviewScore  * 0.30
+    )
   }
 
   function getTopicBreakdown() {
@@ -59,5 +141,10 @@ export function useLearn() {
     return topics
   }
 
-  return { learnings, loading, addLearning, updateLearning, deleteLearning, getWeekLearnings, getWeekScore, getTopicBreakdown }
+  return {
+    learnings, loading,
+    addLearning, updateLearning, deleteLearning,
+    recordReview,
+    getWeekLearnings, getDueForReview, getWeekScore, getTopicBreakdown,
+  }
 }
