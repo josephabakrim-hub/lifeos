@@ -4,7 +4,7 @@ import {
   doc, onSnapshot, query, orderBy
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { formatDate } from '../lib/utils'
+import { formatDate, getWeekStart } from '../lib/utils'
 
 // Returns true if a habit is scheduled on the given dateStr
 // scheduledDays is an array of day numbers [0=Sun..6=Sat], default all days if absent
@@ -76,18 +76,22 @@ export function useHabits() {
     return Math.round((done / scheduledToday.length) * 100)
   }
 
-  // Week score — each day only counts habits scheduled that day
+  // Week score — only counts days from Monday of the current week up to today
   function getWeekScore() {
     const activeHabits = habits.filter(h => h.active && !h.mastered)
     if (!activeHabits.length) return 0
 
+    const weekStart = getWeekStart()
+    const today = formatDate()
     let totalScore = 0
     let countedDays = 0
 
     for (let i = 0; i < 7; i++) {
-      const d = new Date()
-      d.setDate(d.getDate() - i)
+      const d = new Date(weekStart + 'T12:00:00')
+      d.setDate(d.getDate() + i)
       const date = formatDate(d)
+      if (date > today) break // don't count future days
+
       const scheduledThatDay = activeHabits.filter(h => isHabitScheduledOn(h, date))
       if (!scheduledThatDay.length) continue
 
