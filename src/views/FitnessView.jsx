@@ -455,7 +455,7 @@ function SmartFoodModal({ onClose, onSave, editEntry }) {
               <div
                 key={cat.key}
                 onClick={() => { setCategory(cat.key); setStep('food') }}
-                style={{ padding: '16px 14px', borderRadius: 10, cursor: 'pointer', background: 'var(--bg3)', border: `1px solid var(--border2)', textAlign: 'center', transition: 'all 0.15s' }}
+                style={{ padding: '16px 14px', borderRadius: 10, cursor: 'pointer', background: 'var(--bg3)', border: '1px solid var(--border2)', textAlign: 'center', transition: 'all 0.15s' }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = cat.color; e.currentTarget.style.background = cat.color + '15' }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.background = 'var(--bg3)' }}
               >
