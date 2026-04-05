@@ -28,69 +28,161 @@ function getTypeInfo(value) {
 
 function isHuberman(type) { return HUBERMAN_TYPES.some(t => t.value === type) }
 
-// ─── Nutrition food database (Vietnam-friendly) ───────────────────────────────
-// per 100g unless noted — { name, cal, protein, carbs, fat, fiber, category, unit, unitGrams, vietnam }
+// ─── Nutrition food database ──────────────────────────────────────────────────
+// per 100g unless noted — { name, cal, protein, carbs, fat, fiber, category, unit, unitGrams }
 
 const FOOD_DB = [
-  // PROTEIN SOURCES
-  { id: 'chicken_breast',   name: 'Chicken breast',       cal: 165, protein: 31, carbs: 0,  fat: 3.6, fiber: 0,   category: 'protein', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'chicken_thigh',    name: 'Chicken thigh',        cal: 209, protein: 26, carbs: 0,  fat: 11,  fiber: 0,   category: 'protein', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'pork_lean',        name: 'Lean pork (thịt heo)', cal: 143, protein: 26, carbs: 0,  fat: 4,   fiber: 0,   category: 'protein', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'fish_mackerel',    name: 'Mackerel (cá thu)',     cal: 205, protein: 19, carbs: 0,  fat: 14,  fiber: 0,   category: 'protein', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'fish_tilapia',     name: 'Tilapia (cá rô phi)',  cal: 96,  protein: 20, carbs: 0,  fat: 2,   fiber: 0,   category: 'protein', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'shrimp',           name: 'Shrimp (tôm)',          cal: 99,  protein: 24, carbs: 0,  fat: 0.3, fiber: 0,   category: 'protein', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'squid',            name: 'Squid (mực)',           cal: 92,  protein: 16, carbs: 3,  fat: 1.4, fiber: 0,   category: 'protein', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'egg_whole',        name: 'Egg (whole)',           cal: 155, protein: 13, carbs: 1,  fat: 11,  fiber: 0,   category: 'protein', unit: '1 egg',   unitGrams: 60,  vietnam: true  },
-  { id: 'egg_white',        name: 'Egg white',            cal: 52,  protein: 11, carbs: 1,  fat: 0.2, fiber: 0,   category: 'protein', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'tofu_firm',        name: 'Tofu firm (đậu hũ)',   cal: 76,  protein: 8,  carbs: 2,  fat: 4,   fiber: 0.3, category: 'protein', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'peanuts',          name: 'Peanuts (đậu phộng)',  cal: 567, protein: 26, carbs: 16, fat: 49,  fiber: 8.5, category: 'protein', unit: '30g',     unitGrams: 30,  vietnam: true  },
-  { id: 'black_beans',      name: 'Black beans (đậu đen)',cal: 132, protein: 9,  carbs: 24, fat: 0.5, fiber: 8.7, category: 'protein', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'lentils',          name: 'Lentils (đậu lăng)',   cal: 116, protein: 9,  carbs: 20, fat: 0.4, fiber: 7.9, category: 'protein', unit: '100g',    unitGrams: 100, vietnam: false },
-  { id: 'greek_yogurt',     name: 'Greek yogurt',         cal: 59,  protein: 10, carbs: 3.6,fat: 0.4, fiber: 0,   category: 'protein', unit: '100g',    unitGrams: 100, vietnam: false },
-  { id: 'snails',           name: 'Snails (ốc)',           cal: 90,  protein: 16, carbs: 2,  fat: 1.4, fiber: 0,   category: 'protein', unit: '100g',    unitGrams: 100, vietnam: true  },
-  // CARB SOURCES
-  { id: 'white_rice',       name: 'White rice (cơm)',     cal: 130, protein: 2.7,carbs: 28, fat: 0.3, fiber: 0.4, category: 'carbs',   unit: '1 bowl (180g)', unitGrams: 180, vietnam: true },
-  { id: 'brown_rice',       name: 'Brown rice (gạo lứt)', cal: 112, protein: 2.6,carbs: 23, fat: 0.9, fiber: 1.8, category: 'carbs',   unit: '1 bowl (180g)', unitGrams: 180, vietnam: true },
-  { id: 'oats',             name: 'Oats (yến mạch)',      cal: 389, protein: 17, carbs: 66, fat: 7,   fiber: 10,  category: 'carbs',   unit: '100g',    unitGrams: 100, vietnam: false },
-  { id: 'sweet_potato',     name: 'Sweet potato (khoai)', cal: 86,  protein: 1.6,carbs: 20, fat: 0.1, fiber: 3,   category: 'carbs',   unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'bread_white',      name: 'Bánh mì (white)',      cal: 265, protein: 9,  carbs: 49, fat: 3.2, fiber: 2.7, category: 'carbs',   unit: '1 slice (35g)', unitGrams: 35, vietnam: true },
-  { id: 'bread_whole',      name: 'Whole grain bread',   cal: 247, protein: 13, carbs: 41, fat: 4.2, fiber: 6,   category: 'carbs',   unit: '1 slice (35g)', unitGrams: 35, vietnam: false },
-  { id: 'banana',           name: 'Banana (chuối)',        cal: 89,  protein: 1.1,carbs: 23, fat: 0.3, fiber: 2.6, category: 'carbs',   unit: '1 medium (120g)', unitGrams: 120, vietnam: true },
-  { id: 'mango',            name: 'Mango (xoài)',          cal: 60,  protein: 0.8,carbs: 15, fat: 0.4, fiber: 1.6, category: 'carbs',   unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'noodles_pho',      name: 'Phở noodles',          cal: 108, protein: 2.5,carbs: 24, fat: 0.2, fiber: 0.5, category: 'carbs',   unit: '1 bowl (200g)', unitGrams: 200, vietnam: true },
-  { id: 'cassava',          name: 'Cassava (khoai mì)',   cal: 160, protein: 1.4,carbs: 38, fat: 0.3, fiber: 1.8, category: 'carbs',   unit: '100g',    unitGrams: 100, vietnam: true  },
-  // VEGETABLES / FIBER
-  { id: 'broccoli',         name: 'Broccoli',             cal: 34,  protein: 2.8,carbs: 7,  fat: 0.4, fiber: 2.6, category: 'veggies', unit: '100g',    unitGrams: 100, vietnam: false },
-  { id: 'spinach',          name: 'Spinach (rau bina)',   cal: 23,  protein: 2.9,carbs: 3.6,fat: 0.4, fiber: 2.2, category: 'veggies', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'morning_glory',    name: 'Morning glory (rau muống)', cal: 19, protein: 2.6, carbs: 3.1, fat: 0.2, fiber: 2, category: 'veggies', unit: '100g', unitGrams: 100, vietnam: true },
-  { id: 'cabbage',          name: 'Cabbage (bắp cải)',    cal: 25,  protein: 1.3,carbs: 5.8,fat: 0.1, fiber: 2.5, category: 'veggies', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'carrot',           name: 'Carrot (cà rốt)',      cal: 41,  protein: 0.9,carbs: 10, fat: 0.2, fiber: 2.8, category: 'veggies', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'tomato',           name: 'Tomato (cà chua)',     cal: 18,  protein: 0.9,carbs: 3.9,fat: 0.2, fiber: 1.2, category: 'veggies', unit: '1 medium (150g)', unitGrams: 150, vietnam: true },
-  { id: 'eggplant',         name: 'Eggplant (cà tím)',    cal: 25,  protein: 1,  carbs: 5.9,fat: 0.2, fiber: 3,   category: 'veggies', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'cucumber',         name: 'Cucumber (dưa leo)',   cal: 15,  protein: 0.7,carbs: 3.6,fat: 0.1, fiber: 0.5, category: 'veggies', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'bean_sprouts',     name: 'Bean sprouts (giá đỗ)',cal: 31,  protein: 3.1,carbs: 5.9,fat: 0.2, fiber: 1.8, category: 'veggies', unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'bitter_melon',     name: 'Bitter melon (khổ qua)',cal: 17, protein: 1,  carbs: 3.7,fat: 0.2, fiber: 2.8, category: 'veggies', unit: '100g',    unitGrams: 100, vietnam: true  },
-  // FRUITS
-  { id: 'papaya',           name: 'Papaya (đu đủ)',       cal: 43,  protein: 0.5,carbs: 11, fat: 0.3, fiber: 1.7, category: 'fruits',  unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'watermelon',       name: 'Watermelon (dưa hấu)', cal: 30,  protein: 0.6,carbs: 7.6,fat: 0.2, fiber: 0.4, category: 'fruits',  unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'pineapple',        name: 'Pineapple (dứa)',      cal: 50,  protein: 0.5,carbs: 13, fat: 0.1, fiber: 1.4, category: 'fruits',  unit: '100g',    unitGrams: 100, vietnam: true  },
-  { id: 'orange',           name: 'Orange (cam)',          cal: 47,  protein: 0.9,carbs: 12, fat: 0.1, fiber: 2.4, category: 'fruits',  unit: '1 medium (150g)', unitGrams: 150, vietnam: true },
-  { id: 'dragon_fruit',     name: 'Dragon fruit (thanh long)', cal: 60, protein: 1.2, carbs: 13, fat: 0, fiber: 3, category: 'fruits', unit: '100g', unitGrams: 100, vietnam: true },
-  { id: 'lychee',           name: 'Lychee (vải)',          cal: 66,  protein: 0.8,carbs: 17, fat: 0.4, fiber: 1.3, category: 'fruits',  unit: '100g',    unitGrams: 100, vietnam: true  },
-  // HEALTHY FATS
-  { id: 'avocado',          name: 'Avocado (bơ)',          cal: 160, protein: 2,  carbs: 9,  fat: 15,  fiber: 7,   category: 'fats',    unit: '½ fruit (75g)', unitGrams: 75, vietnam: true },
-  { id: 'coconut_oil',      name: 'Coconut oil',           cal: 862, protein: 0,  carbs: 0,  fat: 100, fiber: 0,   category: 'fats',    unit: '1 tbsp (14g)',  unitGrams: 14, vietnam: true },
-  { id: 'olive_oil',        name: 'Olive oil',             cal: 884, protein: 0,  carbs: 0,  fat: 100, fiber: 0,   category: 'fats',    unit: '1 tbsp (14g)',  unitGrams: 14, vietnam: false },
-  { id: 'fish_salmon',      name: 'Salmon',                cal: 208, protein: 20, carbs: 0,  fat: 13,  fiber: 0,   category: 'fats',    unit: '100g',    unitGrams: 100, vietnam: false },
-  { id: 'cashews',          name: 'Cashews (hạt điều)',    cal: 553, protein: 18, carbs: 30, fat: 44,  fiber: 3.3, category: 'fats',    unit: '30g',     unitGrams: 30,  vietnam: true  },
-  // MIXED MEALS
-  { id: 'pho_bo',           name: 'Phở bò (beef noodle soup)', cal: 350, protein: 22, carbs: 45, fat: 8, fiber: 1.5, category: 'mixed', unit: '1 bowl',  unitGrams: 500, vietnam: true  },
-  { id: 'com_tam',          name: 'Cơm tấm (broken rice)',    cal: 520, protein: 35, carbs: 55, fat: 16, fiber: 2,  category: 'mixed', unit: '1 plate', unitGrams: 400, vietnam: true  },
-  { id: 'banh_mi',          name: 'Bánh mì (sandwich)',       cal: 380, protein: 18, carbs: 48, fat: 12, fiber: 3,  category: 'mixed', unit: '1 bánh',  unitGrams: 200, vietnam: true  },
-  { id: 'bun_bo_hue',       name: 'Bún bò Huế',              cal: 420, protein: 25, carbs: 48, fat: 14, fiber: 2,  category: 'mixed', unit: '1 bowl',  unitGrams: 500, vietnam: true  },
-  { id: 'rice_chicken',     name: 'Grilled chicken + rice + veg', cal: 480, protein: 42, carbs: 45, fat: 9, fiber: 4, category: 'mixed', unit: '1 plate', unitGrams: 450, vietnam: true },
-  { id: 'fried_rice',       name: 'Cơm chiên (fried rice)',  cal: 300, protein: 10, carbs: 42, fat: 10, fiber: 1.5, category: 'mixed', unit: '1 plate', unitGrams: 300, vietnam: true  },
-  { id: 'stir_fry_tofu',    name: 'Tofu stir-fry + rice',    cal: 380, protein: 18, carbs: 48, fat: 10, fiber: 4,  category: 'mixed', unit: '1 plate', unitGrams: 350, vietnam: true  },
+  // ── PROTEIN SOURCES (28 items) ───────────────────────────────────────────────
+  { id: 'chicken_breast',    name: 'Chicken breast',          cal: 165, protein: 31,  carbs: 0,   fat: 3.6, fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'chicken_thigh',     name: 'Chicken thigh',           cal: 209, protein: 26,  carbs: 0,   fat: 11,  fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'turkey_breast',     name: 'Turkey breast',           cal: 135, protein: 30,  carbs: 0,   fat: 1,   fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'lean_beef',         name: 'Lean beef (sirloin)',     cal: 207, protein: 26,  carbs: 0,   fat: 11,  fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'ground_beef_lean',  name: 'Ground beef (90% lean)',  cal: 176, protein: 20,  carbs: 0,   fat: 10,  fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'pork_tenderloin',   name: 'Pork tenderloin',         cal: 143, protein: 26,  carbs: 0,   fat: 4,   fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'pork_chop',         name: 'Pork chop',               cal: 187, protein: 29,  carbs: 0,   fat: 7,   fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'salmon',            name: 'Salmon',                  cal: 208, protein: 20,  carbs: 0,   fat: 13,  fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'tuna_fresh',        name: 'Tuna (fresh)',            cal: 144, protein: 30,  carbs: 0,   fat: 1.3, fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'tuna_canned',       name: 'Tuna (canned in water)',  cal: 116, protein: 26,  carbs: 0,   fat: 0.8, fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'mackerel',          name: 'Mackerel',                cal: 205, protein: 19,  carbs: 0,   fat: 14,  fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'tilapia',           name: 'Tilapia',                 cal: 96,  protein: 20,  carbs: 0,   fat: 2,   fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'shrimp',            name: 'Shrimp',                  cal: 99,  protein: 24,  carbs: 0,   fat: 0.3, fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'squid',             name: 'Squid',                   cal: 92,  protein: 16,  carbs: 3,   fat: 1.4, fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'cod',               name: 'Cod',                     cal: 82,  protein: 18,  carbs: 0,   fat: 0.7, fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'egg_whole',         name: 'Egg (whole)',             cal: 155, protein: 13,  carbs: 1,   fat: 11,  fiber: 0,   category: 'protein', unit: '1 egg (60g)',   unitGrams: 60  },
+  { id: 'egg_white',         name: 'Egg white',               cal: 52,  protein: 11,  carbs: 1,   fat: 0.2, fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'tofu_firm',         name: 'Tofu (firm)',             cal: 76,  protein: 8,   carbs: 2,   fat: 4,   fiber: 0.3, category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'tofu_silken',       name: 'Tofu (silken)',           cal: 55,  protein: 5,   carbs: 2,   fat: 3,   fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'tempeh',            name: 'Tempeh',                  cal: 193, protein: 19,  carbs: 9,   fat: 11,  fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'greek_yogurt',      name: 'Greek yogurt (plain)',    cal: 59,  protein: 10,  carbs: 3.6, fat: 0.4, fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'cottage_cheese',    name: 'Cottage cheese',          cal: 98,  protein: 11,  carbs: 3.4, fat: 4.3, fiber: 0,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'black_beans',       name: 'Black beans (cooked)',    cal: 132, protein: 9,   carbs: 24,  fat: 0.5, fiber: 8.7, category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'lentils',           name: 'Lentils (cooked)',        cal: 116, protein: 9,   carbs: 20,  fat: 0.4, fiber: 7.9, category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'chickpeas',         name: 'Chickpeas (cooked)',      cal: 164, protein: 9,   carbs: 27,  fat: 2.6, fiber: 7.6, category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'edamame',           name: 'Edamame',                 cal: 121, protein: 11,  carbs: 9,   fat: 5,   fiber: 5,   category: 'protein', unit: '100g',          unitGrams: 100 },
+  { id: 'peanuts',           name: 'Peanuts',                 cal: 567, protein: 26,  carbs: 16,  fat: 49,  fiber: 8.5, category: 'protein', unit: '30g handful',   unitGrams: 30  },
+  { id: 'whey_protein',      name: 'Whey protein (1 scoop)', cal: 120, protein: 24,  carbs: 3,   fat: 2,   fiber: 0,   category: 'protein', unit: '1 scoop (30g)', unitGrams: 30  },
+
+  // ── CARB SOURCES (25 items) ──────────────────────────────────────────────────
+  { id: 'white_rice',        name: 'White rice (cooked)',     cal: 130, protein: 2.7, carbs: 28,  fat: 0.3, fiber: 0.4, category: 'carbs', unit: '1 bowl (180g)',    unitGrams: 180 },
+  { id: 'brown_rice',        name: 'Brown rice (cooked)',     cal: 112, protein: 2.6, carbs: 23,  fat: 0.9, fiber: 1.8, category: 'carbs', unit: '1 bowl (180g)',    unitGrams: 180 },
+  { id: 'jasmine_rice',      name: 'Jasmine rice (cooked)',   cal: 132, protein: 2.7, carbs: 29,  fat: 0.3, fiber: 0.4, category: 'carbs', unit: '1 bowl (180g)',    unitGrams: 180 },
+  { id: 'oats',              name: 'Oats (rolled)',           cal: 389, protein: 17,  carbs: 66,  fat: 7,   fiber: 10,  category: 'carbs', unit: '100g dry',         unitGrams: 100 },
+  { id: 'oatmeal_cooked',    name: 'Oatmeal (cooked)',        cal: 71,  protein: 2.5, carbs: 12,  fat: 1.5, fiber: 1.7, category: 'carbs', unit: '1 bowl (240g)',    unitGrams: 240 },
+  { id: 'sweet_potato',      name: 'Sweet potato',            cal: 86,  protein: 1.6, carbs: 20,  fat: 0.1, fiber: 3,   category: 'carbs', unit: '100g',             unitGrams: 100 },
+  { id: 'potato_white',      name: 'White potato',            cal: 77,  protein: 2,   carbs: 17,  fat: 0.1, fiber: 2.2, category: 'carbs', unit: '1 medium (150g)',  unitGrams: 150 },
+  { id: 'bread_white',       name: 'White bread',             cal: 265, protein: 9,   carbs: 49,  fat: 3.2, fiber: 2.7, category: 'carbs', unit: '1 slice (35g)',    unitGrams: 35  },
+  { id: 'bread_whole',       name: 'Whole grain bread',       cal: 247, protein: 13,  carbs: 41,  fat: 4.2, fiber: 6,   category: 'carbs', unit: '1 slice (35g)',    unitGrams: 35  },
+  { id: 'pasta_cooked',      name: 'Pasta (cooked)',          cal: 158, protein: 5.8, carbs: 31,  fat: 0.9, fiber: 1.8, category: 'carbs', unit: '1 cup (140g)',     unitGrams: 140 },
+  { id: 'rice_noodles',      name: 'Rice noodles (cooked)',   cal: 108, protein: 2.5, carbs: 24,  fat: 0.2, fiber: 0.5, category: 'carbs', unit: '1 bowl (200g)',    unitGrams: 200 },
+  { id: 'quinoa',            name: 'Quinoa (cooked)',         cal: 120, protein: 4.4, carbs: 21,  fat: 1.9, fiber: 2.8, category: 'carbs', unit: '100g',             unitGrams: 100 },
+  { id: 'banana',            name: 'Banana',                  cal: 89,  protein: 1.1, carbs: 23,  fat: 0.3, fiber: 2.6, category: 'carbs', unit: '1 medium (120g)',  unitGrams: 120 },
+  { id: 'mango',             name: 'Mango',                   cal: 60,  protein: 0.8, carbs: 15,  fat: 0.4, fiber: 1.6, category: 'carbs', unit: '100g',             unitGrams: 100 },
+  { id: 'cassava',           name: 'Cassava',                 cal: 160, protein: 1.4, carbs: 38,  fat: 0.3, fiber: 1.8, category: 'carbs', unit: '100g',             unitGrams: 100 },
+  { id: 'corn',              name: 'Corn (cooked)',           cal: 96,  protein: 3.4, carbs: 21,  fat: 1.5, fiber: 2.4, category: 'carbs', unit: '1 ear (90g)',      unitGrams: 90  },
+  { id: 'tortilla_corn',     name: 'Tortilla (corn)',         cal: 218, protein: 5.7, carbs: 46,  fat: 3,   fiber: 6.3, category: 'carbs', unit: '1 medium (45g)',   unitGrams: 45  },
+  { id: 'pita_bread',        name: 'Pita bread',              cal: 275, protein: 9,   carbs: 56,  fat: 1.2, fiber: 2.2, category: 'carbs', unit: '1 pita (60g)',     unitGrams: 60  },
+  { id: 'granola',           name: 'Granola',                 cal: 471, protein: 10,  carbs: 64,  fat: 20,  fiber: 5,   category: 'carbs', unit: '50g',              unitGrams: 50  },
+  { id: 'dates',             name: 'Dates',                   cal: 282, protein: 2.5, carbs: 75,  fat: 0.4, fiber: 8,   category: 'carbs', unit: '3 dates (30g)',    unitGrams: 30  },
+  { id: 'crackers_rice',     name: 'Rice crackers',           cal: 387, protein: 7,   carbs: 82,  fat: 2.8, fiber: 1.4, category: 'carbs', unit: '30g',              unitGrams: 30  },
+  { id: 'cereal_muesli',     name: 'Muesli',                  cal: 357, protein: 10,  carbs: 66,  fat: 5.8, fiber: 7,   category: 'carbs', unit: '50g',              unitGrams: 50  },
+  { id: 'couscous',          name: 'Couscous (cooked)',       cal: 112, protein: 3.8, carbs: 23,  fat: 0.2, fiber: 1.4, category: 'carbs', unit: '100g',             unitGrams: 100 },
+  { id: 'barley_cooked',     name: 'Barley (cooked)',         cal: 123, protein: 2.3, carbs: 28,  fat: 0.4, fiber: 3.8, category: 'carbs', unit: '100g',             unitGrams: 100 },
+  { id: 'breadstick',        name: 'Breadsticks',             cal: 392, protein: 12,  carbs: 72,  fat: 5.8, fiber: 3,   category: 'carbs', unit: '30g',              unitGrams: 30  },
+
+  // ── VEGETABLES (27 items) ────────────────────────────────────────────────────
+  { id: 'broccoli',          name: 'Broccoli',                cal: 34,  protein: 2.8, carbs: 7,   fat: 0.4, fiber: 2.6, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'spinach',           name: 'Spinach',                 cal: 23,  protein: 2.9, carbs: 3.6, fat: 0.4, fiber: 2.2, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'kale',              name: 'Kale',                    cal: 35,  protein: 2.9, carbs: 4.4, fat: 1.5, fiber: 4.1, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'cabbage',           name: 'Cabbage',                 cal: 25,  protein: 1.3, carbs: 5.8, fat: 0.1, fiber: 2.5, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'bok_choy',          name: 'Bok choy',                cal: 13,  protein: 1.5, carbs: 2.2, fat: 0.2, fiber: 1,   category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'carrot',            name: 'Carrot',                  cal: 41,  protein: 0.9, carbs: 10,  fat: 0.2, fiber: 2.8, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'tomato',            name: 'Tomato',                  cal: 18,  protein: 0.9, carbs: 3.9, fat: 0.2, fiber: 1.2, category: 'veggies', unit: '1 medium (150g)', unitGrams: 150 },
+  { id: 'eggplant',          name: 'Eggplant',                cal: 25,  protein: 1,   carbs: 5.9, fat: 0.2, fiber: 3,   category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'cucumber',          name: 'Cucumber',                cal: 15,  protein: 0.7, carbs: 3.6, fat: 0.1, fiber: 0.5, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'zucchini',          name: 'Zucchini',                cal: 17,  protein: 1.2, carbs: 3.1, fat: 0.3, fiber: 1,   category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'bell_pepper',       name: 'Bell pepper',             cal: 31,  protein: 1,   carbs: 6,   fat: 0.3, fiber: 2.1, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'mushroom',          name: 'Mushrooms',               cal: 22,  protein: 3.1, carbs: 3.3, fat: 0.3, fiber: 1,   category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'onion',             name: 'Onion',                   cal: 40,  protein: 1.1, carbs: 9.3, fat: 0.1, fiber: 1.7, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'garlic',            name: 'Garlic',                  cal: 149, protein: 6.4, carbs: 33,  fat: 0.5, fiber: 2.1, category: 'veggies', unit: '1 clove (5g)', unitGrams: 5 },
+  { id: 'ginger',            name: 'Ginger',                  cal: 80,  protein: 1.8, carbs: 18,  fat: 0.8, fiber: 2,   category: 'veggies', unit: '1 tbsp (10g)', unitGrams: 10 },
+  { id: 'bean_sprouts',      name: 'Bean sprouts',            cal: 31,  protein: 3.1, carbs: 5.9, fat: 0.2, fiber: 1.8, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'green_beans',       name: 'Green beans',             cal: 31,  protein: 1.8, carbs: 7,   fat: 0.1, fiber: 2.7, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'peas',              name: 'Peas (green)',            cal: 81,  protein: 5.4, carbs: 14,  fat: 0.4, fiber: 5.1, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'asparagus',         name: 'Asparagus',               cal: 20,  protein: 2.2, carbs: 3.9, fat: 0.1, fiber: 2.1, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'celery',            name: 'Celery',                  cal: 16,  protein: 0.7, carbs: 3,   fat: 0.2, fiber: 1.6, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'cauliflower',       name: 'Cauliflower',             cal: 25,  protein: 1.9, carbs: 5,   fat: 0.3, fiber: 2,   category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'bitter_melon',      name: 'Bitter melon',            cal: 17,  protein: 1,   carbs: 3.7, fat: 0.2, fiber: 2.8, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'morning_glory',     name: 'Morning glory',           cal: 19,  protein: 2.6, carbs: 3.1, fat: 0.2, fiber: 2,   category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'leek',              name: 'Leek',                    cal: 61,  protein: 1.5, carbs: 14,  fat: 0.3, fiber: 1.8, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'radish',            name: 'Radish',                  cal: 16,  protein: 0.7, carbs: 3.4, fat: 0.1, fiber: 1.6, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'lettuce',           name: 'Lettuce (romaine)',       cal: 17,  protein: 1.2, carbs: 3.3, fat: 0.3, fiber: 2.1, category: 'veggies', unit: '100g', unitGrams: 100 },
+  { id: 'pak_choi',          name: 'Pak choi',                cal: 13,  protein: 1.5, carbs: 2.2, fat: 0.2, fiber: 1,   category: 'veggies', unit: '100g', unitGrams: 100 },
+
+  // ── FRUITS (22 items) ────────────────────────────────────────────────────────
+  { id: 'banana_fruit',      name: 'Banana',                  cal: 89,  protein: 1.1, carbs: 23,  fat: 0.3, fiber: 2.6, category: 'fruits', unit: '1 medium (120g)', unitGrams: 120 },
+  { id: 'apple',             name: 'Apple',                   cal: 52,  protein: 0.3, carbs: 14,  fat: 0.2, fiber: 2.4, category: 'fruits', unit: '1 medium (180g)', unitGrams: 180 },
+  { id: 'orange',            name: 'Orange',                  cal: 47,  protein: 0.9, carbs: 12,  fat: 0.1, fiber: 2.4, category: 'fruits', unit: '1 medium (150g)', unitGrams: 150 },
+  { id: 'mango_fruit',       name: 'Mango',                   cal: 60,  protein: 0.8, carbs: 15,  fat: 0.4, fiber: 1.6, category: 'fruits', unit: '100g',            unitGrams: 100 },
+  { id: 'papaya',            name: 'Papaya',                  cal: 43,  protein: 0.5, carbs: 11,  fat: 0.3, fiber: 1.7, category: 'fruits', unit: '100g',            unitGrams: 100 },
+  { id: 'watermelon',        name: 'Watermelon',              cal: 30,  protein: 0.6, carbs: 7.6, fat: 0.2, fiber: 0.4, category: 'fruits', unit: '100g',            unitGrams: 100 },
+  { id: 'pineapple',         name: 'Pineapple',               cal: 50,  protein: 0.5, carbs: 13,  fat: 0.1, fiber: 1.4, category: 'fruits', unit: '100g',            unitGrams: 100 },
+  { id: 'strawberry',        name: 'Strawberries',            cal: 32,  protein: 0.7, carbs: 7.7, fat: 0.3, fiber: 2,   category: 'fruits', unit: '100g',            unitGrams: 100 },
+  { id: 'blueberry',         name: 'Blueberries',             cal: 57,  protein: 0.7, carbs: 14,  fat: 0.3, fiber: 2.4, category: 'fruits', unit: '100g',            unitGrams: 100 },
+  { id: 'grapes',            name: 'Grapes',                  cal: 69,  protein: 0.7, carbs: 18,  fat: 0.2, fiber: 0.9, category: 'fruits', unit: '100g',            unitGrams: 100 },
+  { id: 'pear',              name: 'Pear',                    cal: 57,  protein: 0.4, carbs: 15,  fat: 0.1, fiber: 3.1, category: 'fruits', unit: '1 medium (180g)', unitGrams: 180 },
+  { id: 'kiwi',              name: 'Kiwi',                    cal: 61,  protein: 1.1, carbs: 15,  fat: 0.5, fiber: 3,   category: 'fruits', unit: '1 fruit (70g)',   unitGrams: 70  },
+  { id: 'peach',             name: 'Peach',                   cal: 39,  protein: 0.9, carbs: 10,  fat: 0.3, fiber: 1.5, category: 'fruits', unit: '1 medium (150g)', unitGrams: 150 },
+  { id: 'plum',              name: 'Plum',                    cal: 46,  protein: 0.7, carbs: 11,  fat: 0.3, fiber: 1.4, category: 'fruits', unit: '1 fruit (66g)',   unitGrams: 66  },
+  { id: 'cherries',          name: 'Cherries',                cal: 63,  protein: 1.1, carbs: 16,  fat: 0.2, fiber: 2.1, category: 'fruits', unit: '100g',            unitGrams: 100 },
+  { id: 'dragon_fruit',      name: 'Dragon fruit',            cal: 60,  protein: 1.2, carbs: 13,  fat: 0,   fiber: 3,   category: 'fruits', unit: '100g',            unitGrams: 100 },
+  { id: 'lychee',            name: 'Lychee',                  cal: 66,  protein: 0.8, carbs: 17,  fat: 0.4, fiber: 1.3, category: 'fruits', unit: '100g',            unitGrams: 100 },
+  { id: 'pomelo',            name: 'Pomelo',                  cal: 38,  protein: 0.8, carbs: 9.6, fat: 0,   fiber: 1,   category: 'fruits', unit: '100g',            unitGrams: 100 },
+  { id: 'guava',             name: 'Guava',                   cal: 68,  protein: 2.6, carbs: 14,  fat: 1,   fiber: 5.4, category: 'fruits', unit: '100g',            unitGrams: 100 },
+  { id: 'coconut_fresh',     name: 'Coconut (fresh)',         cal: 354, protein: 3.3, carbs: 15,  fat: 33,  fiber: 9,   category: 'fruits', unit: '50g',             unitGrams: 50  },
+  { id: 'dates_fruit',       name: 'Dates',                   cal: 282, protein: 2.5, carbs: 75,  fat: 0.4, fiber: 8,   category: 'fruits', unit: '3 dates (30g)',   unitGrams: 30  },
+  { id: 'cantaloupe',        name: 'Cantaloupe',              cal: 34,  protein: 0.8, carbs: 8.2, fat: 0.2, fiber: 0.9, category: 'fruits', unit: '100g',            unitGrams: 100 },
+
+  // ── HEALTHY FATS (18 items) ──────────────────────────────────────────────────
+  { id: 'avocado',           name: 'Avocado',                 cal: 160, protein: 2,   carbs: 9,   fat: 15,  fiber: 7,   category: 'fats', unit: '½ fruit (75g)',  unitGrams: 75  },
+  { id: 'olive_oil',         name: 'Olive oil',               cal: 884, protein: 0,   carbs: 0,   fat: 100, fiber: 0,   category: 'fats', unit: '1 tbsp (14g)',   unitGrams: 14  },
+  { id: 'coconut_oil',       name: 'Coconut oil',             cal: 862, protein: 0,   carbs: 0,   fat: 100, fiber: 0,   category: 'fats', unit: '1 tbsp (14g)',   unitGrams: 14  },
+  { id: 'salmon_fats',       name: 'Salmon (omega-3 rich)',   cal: 208, protein: 20,  carbs: 0,   fat: 13,  fiber: 0,   category: 'fats', unit: '100g',           unitGrams: 100 },
+  { id: 'sardines',          name: 'Sardines (canned)',       cal: 208, protein: 25,  carbs: 0,   fat: 11,  fiber: 0,   category: 'fats', unit: '100g',           unitGrams: 100 },
+  { id: 'cashews',           name: 'Cashews',                 cal: 553, protein: 18,  carbs: 30,  fat: 44,  fiber: 3.3, category: 'fats', unit: '30g handful',    unitGrams: 30  },
+  { id: 'almonds',           name: 'Almonds',                 cal: 579, protein: 21,  carbs: 22,  fat: 50,  fiber: 12.5,category: 'fats', unit: '30g handful',    unitGrams: 30  },
+  { id: 'walnuts',           name: 'Walnuts',                 cal: 654, protein: 15,  carbs: 14,  fat: 65,  fiber: 6.7, category: 'fats', unit: '30g handful',    unitGrams: 30  },
+  { id: 'macadamia',         name: 'Macadamia nuts',          cal: 718, protein: 7.9, carbs: 14,  fat: 76,  fiber: 8.6, category: 'fats', unit: '30g handful',    unitGrams: 30  },
+  { id: 'pumpkin_seeds',     name: 'Pumpkin seeds',           cal: 559, protein: 30,  carbs: 11,  fat: 49,  fiber: 6,   category: 'fats', unit: '30g',            unitGrams: 30  },
+  { id: 'sunflower_seeds',   name: 'Sunflower seeds',         cal: 584, protein: 21,  carbs: 20,  fat: 51,  fiber: 8.6, category: 'fats', unit: '30g',            unitGrams: 30  },
+  { id: 'chia_seeds',        name: 'Chia seeds',              cal: 486, protein: 17,  carbs: 42,  fat: 31,  fiber: 34,  category: 'fats', unit: '2 tbsp (20g)',   unitGrams: 20  },
+  { id: 'flaxseeds',         name: 'Flaxseeds',               cal: 534, protein: 18,  carbs: 29,  fat: 42,  fiber: 27,  category: 'fats', unit: '2 tbsp (20g)',   unitGrams: 20  },
+  { id: 'peanut_butter',     name: 'Peanut butter',           cal: 588, protein: 25,  carbs: 20,  fat: 50,  fiber: 6,   category: 'fats', unit: '2 tbsp (32g)',   unitGrams: 32  },
+  { id: 'almond_butter',     name: 'Almond butter',           cal: 614, protein: 21,  carbs: 19,  fat: 56,  fiber: 10,  category: 'fats', unit: '2 tbsp (32g)',   unitGrams: 32  },
+  { id: 'butter',            name: 'Butter',                  cal: 717, protein: 0.9, carbs: 0.1, fat: 81,  fiber: 0,   category: 'fats', unit: '1 tbsp (14g)',   unitGrams: 14  },
+  { id: 'full_fat_cheese',   name: 'Cheddar cheese',          cal: 402, protein: 25,  carbs: 1.3, fat: 33,  fiber: 0,   category: 'fats', unit: '30g slice',      unitGrams: 30  },
+  { id: 'dark_chocolate',    name: 'Dark chocolate (85%)',    cal: 598, protein: 8,   carbs: 46,  fat: 43,  fiber: 11,  category: 'fats', unit: '30g (3 squares)',unitGrams: 30  },
+
+  // ── MIXED MEALS (20 items) ───────────────────────────────────────────────────
+  { id: 'rice_chicken_veg',  name: 'Grilled chicken + rice + veg',  cal: 480, protein: 42, carbs: 45, fat: 9,  fiber: 4,   category: 'mixed', unit: '1 plate', unitGrams: 450 },
+  { id: 'beef_stir_fry',     name: 'Beef stir-fry + rice',          cal: 520, protein: 35, carbs: 50, fat: 16, fiber: 3,   category: 'mixed', unit: '1 plate', unitGrams: 450 },
+  { id: 'omelette_3egg',     name: '3-egg omelette (cheese + veg)', cal: 320, protein: 24, carbs: 5,  fat: 22, fiber: 1.5, category: 'mixed', unit: '1 omelette', unitGrams: 250 },
+  { id: 'salmon_veg',        name: 'Salmon fillet + steamed veg',   cal: 380, protein: 38, carbs: 12, fat: 18, fiber: 4,   category: 'mixed', unit: '1 plate', unitGrams: 350 },
+  { id: 'tuna_salad',        name: 'Tuna salad (no dressing)',      cal: 220, protein: 30, carbs: 8,  fat: 6,  fiber: 3,   category: 'mixed', unit: '1 bowl',  unitGrams: 300 },
+  { id: 'chicken_salad',     name: 'Grilled chicken salad',         cal: 280, protein: 32, carbs: 10, fat: 10, fiber: 4,   category: 'mixed', unit: '1 bowl',  unitGrams: 350 },
+  { id: 'poke_bowl',         name: 'Poke bowl',                     cal: 490, protein: 30, carbs: 55, fat: 14, fiber: 5,   category: 'mixed', unit: '1 bowl',  unitGrams: 400 },
+  { id: 'burger_plain',      name: 'Burger (beef, no bun)',         cal: 290, protein: 26, carbs: 0,  fat: 20, fiber: 0,   category: 'mixed', unit: '1 patty', unitGrams: 150 },
+  { id: 'chicken_soup',      name: 'Chicken & vegetable soup',      cal: 180, protein: 18, carbs: 14, fat: 5,  fiber: 3,   category: 'mixed', unit: '1 bowl',  unitGrams: 400 },
+  { id: 'lentil_soup',       name: 'Lentil soup',                   cal: 230, protein: 14, carbs: 35, fat: 4,  fiber: 9,   category: 'mixed', unit: '1 bowl',  unitGrams: 400 },
+  { id: 'tofu_stir_fry',     name: 'Tofu stir-fry + rice',          cal: 380, protein: 18, carbs: 48, fat: 10, fiber: 4,   category: 'mixed', unit: '1 plate', unitGrams: 350 },
+  { id: 'pasta_bolognese',   name: 'Pasta bolognese',               cal: 520, protein: 28, carbs: 60, fat: 16, fiber: 4,   category: 'mixed', unit: '1 plate', unitGrams: 400 },
+  { id: 'pasta_chicken',     name: 'Chicken pasta (tomato sauce)',  cal: 460, protein: 35, carbs: 52, fat: 9,  fiber: 4,   category: 'mixed', unit: '1 plate', unitGrams: 400 },
+  { id: 'rice_beans',        name: 'Rice + black beans',            cal: 340, protein: 14, carbs: 65, fat: 3,  fiber: 10,  category: 'mixed', unit: '1 plate', unitGrams: 350 },
+  { id: 'shrimp_fried_rice', name: 'Shrimp fried rice',             cal: 420, protein: 22, carbs: 55, fat: 12, fiber: 2,   category: 'mixed', unit: '1 plate', unitGrams: 380 },
+  { id: 'greek_salad',       name: 'Greek salad + grilled chicken', cal: 350, protein: 30, carbs: 12, fat: 18, fiber: 3,   category: 'mixed', unit: '1 bowl',  unitGrams: 350 },
+  { id: 'wrap_chicken',      name: 'Chicken wrap (whole grain)',    cal: 430, protein: 32, carbs: 42, fat: 12, fiber: 5,   category: 'mixed', unit: '1 wrap',  unitGrams: 280 },
+  { id: 'congee',            name: 'Rice congee (plain)',           cal: 70,  protein: 1.5, carbs: 15, fat: 0.2, fiber: 0.2, category: 'mixed', unit: '1 bowl', unitGrams: 300 },
+  { id: 'noodle_soup',       name: 'Noodle soup (chicken broth)',   cal: 320, protein: 20, carbs: 42, fat: 7,  fiber: 2,   category: 'mixed', unit: '1 bowl',  unitGrams: 500 },
+  { id: 'fried_egg_rice',    name: 'Fried egg + rice + veggies',    cal: 420, protein: 18, carbs: 55, fat: 14, fiber: 3,   category: 'mixed', unit: '1 plate', unitGrams: 400 },
 ]
 
 const FOOD_CATEGORIES = [
@@ -413,17 +505,14 @@ function SmartFoodModal({ onClose, onSave, editEntry }) {
   const [notes,       setNotes]       = useState(editEntry?.notes       || '')
   const [date,        setDate]        = useState(editEntry?.date        || formatDate())
   const [search,      setSearch]      = useState('')
-  const [vietnamOnly, setVietnamOnly] = useState(false)
-
   const filteredFoods = useMemo(() => {
     let list = category ? FOOD_DB.filter(f => f.category === category) : FOOD_DB
-    if (vietnamOnly) list = list.filter(f => f.vietnam)
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(f => f.name.toLowerCase().includes(q))
     }
     return list
-  }, [category, search, vietnamOnly])
+  }, [category, search])
 
   const macros = selectedFood ? calcMacros(selectedFood.id, qty) : null
 
@@ -498,12 +587,7 @@ function SmartFoodModal({ onClose, onSave, editEntry }) {
               placeholder="Search food..."
               style={{ flex: 1 }}
             />
-            <button
-              onClick={() => setVietnamOnly(v => !v)}
-              style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${vietnamOnly ? '#22c55e' : 'var(--border2)'}`, background: vietnamOnly ? 'rgba(34,197,94,0.1)' : 'var(--bg3)', color: vietnamOnly ? '#22c55e' : 'var(--text3)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              🇻🇳 VN only
-            </button>
+
           </div>
 
           <div style={{ maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -518,7 +602,7 @@ function SmartFoodModal({ onClose, onSave, editEntry }) {
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = 'var(--bg3)' }}
               >
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{food.name}{food.vietnam && <span style={{ marginLeft: 6, fontSize: 11, color: '#22c55e' }}>🇻🇳</span>}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{food.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>per {food.unit}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 10, fontSize: 12, color: 'var(--text3)' }}>
