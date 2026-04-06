@@ -574,11 +574,12 @@ function GoalCard({
   addTask, toggleTask, deleteTask, setNextAction,
   logDailyOneThing, onWOOP, onEdit,
 }) {
+  const category       = CATEGORIES.includes(goal.category) ? goal.category : 'Other'
   const progress       = goal.progress || 0
   const milestones     = goal.milestones || []
   const doneMilestones = milestones.filter(m => m.done).length
-  const color          = CATEGORY_COLORS[goal.category] || '#7c6aff'
-  const icon           = CATEGORY_ICONS[goal.category]  || '🎯'
+  const color          = CATEGORY_COLORS[category] || '#7c6aff'
+  const icon           = CATEGORY_ICONS[category]  || '🎯'
   const daysLeft       = getCountdown(goal.targetDate)
   const isOverdue      = daysLeft !== null && daysLeft < 0
   const streak         = calcStreak(goal.oneThing)
@@ -640,7 +641,7 @@ function GoalCard({
             {/* Top row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 11, fontWeight: 700, color, padding: '2px 8px', borderRadius: 20, background: color + '15' }}>
-                {goal.category}
+                {category}
               </span>
               <span style={{ fontSize: 11, fontWeight: 600, color: statusLabel.color, padding: '2px 8px', borderRadius: 20, background: statusLabel.bg }}>
                 {statusLabel.text}
@@ -1113,7 +1114,7 @@ export default function GoalsView({
   window._oneThingGoal = (goal) => { setOneThingGoal(goal); setShowOneThingModal(true) }
 
   const sortedGoals = [...activeGoals]
-    .filter(g => categoryFilter === 'All' || g.category === categoryFilter)
+    .filter(g => categoryFilter === 'All' || normalizeCategory(g.category) === categoryFilter)
     .sort((a, b) => {
       const dA = getCountdown(a.targetDate)
       const dB = getCountdown(b.targetDate)
@@ -1136,7 +1137,8 @@ export default function GoalsView({
     updateGoal(goalId, { woop })
   }
 
-  const usedCategories = ['All', ...Array.from(new Set(activeGoals.map(g => g.category)))]
+  const normalizeCategory = (cat) => CATEGORIES.includes(cat) ? cat : 'Other'
+  const usedCategories = ['All', ...Array.from(new Set(activeGoals.map(g => normalizeCategory(g.category))))]
 
   if (loading) return <div style={{ color: 'var(--text3)', padding: 40, textAlign: 'center' }}>Loading...</div>
 
