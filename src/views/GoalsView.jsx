@@ -1,26 +1,34 @@
 import { useState } from 'react'
 import { formatDate, scoreColor } from '../lib/utils'
 
-const CATEGORIES = ['Trading', 'Health', 'Focus', 'Learning', 'Mental', 'Social', 'Other']
+const CATEGORIES = ['Trading', 'Business', 'Health', 'Focus', 'Learning', 'Mental', 'Social', 'Finance', 'Creativity', 'Travel', 'Other']
 
 const CATEGORY_COLORS = {
-  Trading:  '#14b8a6',
-  Health:   '#f97316',
-  Focus:    '#7c6aff',
-  Learning: '#f59e0b',
-  Mental:   '#a855f7',
-  Social:   '#ec4899',
-  Other:    '#9898b0',
+  Trading:    '#14b8a6',
+  Business:   '#0ea5e9',
+  Health:     '#f97316',
+  Focus:      '#7c6aff',
+  Learning:   '#f59e0b',
+  Mental:     '#a855f7',
+  Social:     '#ec4899',
+  Finance:    '#22c55e',
+  Creativity: '#f43f5e',
+  Travel:     '#06b6d4',
+  Other:      '#9898b0',
 }
 
 const CATEGORY_ICONS = {
-  Trading:  '📈',
-  Health:   '💪',
-  Focus:    '🧠',
-  Learning: '📚',
-  Mental:   '🧘',
-  Social:   '❤️',
-  Other:    '🎯',
+  Trading:    '📈',
+  Business:   '💼',
+  Health:     '💪',
+  Focus:      '🧠',
+  Learning:   '📚',
+  Mental:     '🧘',
+  Social:     '❤️',
+  Finance:    '💰',
+  Creativity: '🎨',
+  Travel:     '✈️',
+  Other:      '🎯',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -564,7 +572,7 @@ function GoalCard({
   goal, isExpanded, onToggleExpand,
   updateGoal, deleteGoal, toggleMilestone,
   addTask, toggleTask, deleteTask, setNextAction,
-  logDailyOneThing, onWOOP,
+  logDailyOneThing, onWOOP, onEdit,
 }) {
   const progress       = goal.progress || 0
   const milestones     = goal.milestones || []
@@ -720,19 +728,19 @@ function GoalCard({
       {isExpanded && (
         <div style={{ padding: '0 20px 20px', borderTop: '1px solid var(--border)' }}>
 
-          {/* Why + week commit */}
-          <div style={{ display: 'flex', gap: 10, marginTop: 14, marginBottom: 14, flexWrap: 'wrap' }}>
-            {goal.why && (
-              <div style={{ flex: 1, minWidth: 200, padding: '8px 12px', borderRadius: 8, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 12, color: '#f59e0b', lineHeight: 1.5 }}>
-                💡 <strong>Why:</strong> {goal.why}
-              </div>
-            )}
-            {thisWeekCommit && (
-              <div style={{ flex: 1, minWidth: 200, padding: '8px 12px', borderRadius: 8, background: 'rgba(124,106,255,0.07)', border: '1px solid rgba(124,106,255,0.2)', fontSize: 12, color: '#7c6aff', lineHeight: 1.5 }}>
-                📅 <strong>This week:</strong> {thisWeekCommit.text}
-              </div>
-            )}
-          </div>
+          {/* Why */}
+          {goal.why && (
+            <div style={{ marginTop: 14, marginBottom: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 13, color: '#f59e0b', lineHeight: 1.6 }}>
+              💡 <strong>Why I want this:</strong> {goal.why}
+            </div>
+          )}
+
+          {/* Week commit */}
+          {thisWeekCommit && (
+            <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(124,106,255,0.07)', border: '1px solid rgba(124,106,255,0.2)', fontSize: 12, color: '#7c6aff', lineHeight: 1.5 }}>
+              📅 <strong>This week:</strong> {thisWeekCommit.text}
+            </div>
+          )}
 
           {/* Deadline timeline */}
           {goal.targetDate && (() => {
@@ -830,10 +838,22 @@ function GoalCard({
               <button
                 className="btn btn-sm"
                 style={{ background: 'rgba(34,197,94,0.08)', borderColor: 'rgba(34,197,94,0.3)', color: '#22c55e', fontSize: 11 }}
-                onClick={() => updateGoal(goal.id, { status: 'completed', completedAt: new Date().toISOString() })}
+                onClick={() => {
+                  if (window.confirm(`Mark "${goal.title}" as completed? You can restore it later from the Completed Goals section.`)) {
+                    updateGoal(goal.id, { status: 'completed', completedAt: new Date().toISOString() })
+                  }
+                }}
               >✓ Complete</button>
-              <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => {/* edit handled outside */}}>✏️ Edit</button>
-              <button className="btn btn-sm btn-danger" style={{ fontSize: 11 }} onClick={() => deleteGoal(goal.id)}>✕</button>
+              <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => onEdit(goal)}>✏️ Edit</button>
+              <button
+                className="btn btn-sm btn-danger"
+                style={{ fontSize: 11 }}
+                onClick={() => {
+                  if (window.confirm(`Permanently delete "${goal.title}"? This cannot be undone.`)) {
+                    deleteGoal(goal.id)
+                  }
+                }}
+              >✕ Delete</button>
             </div>
           </div>
         </div>
@@ -973,6 +993,92 @@ function OneThingModal({ goal, onClose, onSave }) {
           <button className="btn btn-primary" onClick={() => { if (text.trim()) { onSave(goal.id, text.trim()); onClose() } }}>Log it</button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── Completed Goals History ──────────────────────────────────────────────────
+
+function CompletedGoalsHistory({ completedGoals, onRestore, onDelete }) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div style={{ marginTop: 28 }}>
+      <button
+        onClick={() => setIsOpen(p => !p)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+          padding: '12px 16px', borderRadius: 10,
+          background: 'var(--bg2)', border: '1px solid var(--border)',
+          cursor: 'pointer', color: 'var(--text2)',
+          transition: 'all 0.15s',
+        }}
+      >
+        <span style={{ fontSize: 16 }}>🏆</span>
+        <span style={{ fontSize: 13, fontWeight: 700 }}>Completed Goals</span>
+        <span style={{
+          fontSize: 12, color: 'var(--text3)',
+          padding: '1px 8px', borderRadius: 20,
+          background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)',
+          color: '#22c55e', fontWeight: 700,
+        }}>{completedGoals.length}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text3)', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'none', display: 'inline-block' }}>▼</span>
+      </button>
+
+      {isOpen && (
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {completedGoals.map(goal => {
+            const color = CATEGORY_COLORS[goal.category] || '#22c55e'
+            const icon  = CATEGORY_ICONS[goal.category]  || '🎯'
+            return (
+              <div key={goal.id} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 16px', borderRadius: 10,
+                background: 'var(--bg2)', border: '1px solid var(--border)',
+              }}>
+                {/* icon */}
+                <span style={{ fontSize: 18, opacity: 0.6 }}>{icon}</span>
+
+                {/* info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', textDecoration: 'line-through', opacity: 0.7 }}>
+                    {goal.title}
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 3, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, color, padding: '1px 7px', borderRadius: 20, background: color + '15' }}>
+                      {goal.category}
+                    </span>
+                    {goal.completedAt && (
+                      <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+                        ✓ {new Date(goal.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                    )}
+                    {goal.progress !== undefined && (
+                      <span style={{ fontSize: 11, color: '#22c55e' }}>{goal.progress}% done</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* actions */}
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button
+                    className="btn btn-sm"
+                    style={{ fontSize: 11, color: '#22c55e', borderColor: 'rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.07)' }}
+                    onClick={() => onRestore(goal.id)}
+                    title="Move back to active goals"
+                  >↩ Restore</button>
+                  <button
+                    className="btn btn-sm btn-danger"
+                    style={{ fontSize: 11 }}
+                    onClick={() => onDelete(goal.id, goal.title)}
+                    title="Permanently delete"
+                  >✕</button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -1190,31 +1296,21 @@ export default function GoalsView({
               setNextAction={setNextAction}
               logDailyOneThing={logDailyOneThing}
               onWOOP={(goal) => { setWOOPGoal(goal); setShowWOOPModal(true) }}
+              onEdit={(goal) => { setEditGoal(goal); setShowGoalModal(true) }}
             />
           ))}
         </div>
       )}
 
-      {/* ── Completed goals ── */}
+      {/* ── Completed goals history ── */}
       {goals.filter(g => g.status !== 'active').length > 0 && (
-        <div style={{ marginTop: 28 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
-            🏆 Completed
-          </div>
-          {goals.filter(g => g.status !== 'active').map(goal => (
-            <div key={goal.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', marginBottom: 6, opacity: 0.5 }}>
-              <div>
-                <span style={{ fontSize: 13, textDecoration: 'line-through', color: 'var(--text3)' }}>{goal.title}</span>
-                {goal.completedAt && (
-                  <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 10 }}>
-                    {new Date(goal.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </span>
-                )}
-              </div>
-              <span className="badge badge-green">✓ Done</span>
-            </div>
-          ))}
-        </div>
+        <CompletedGoalsHistory
+          completedGoals={goals.filter(g => g.status !== 'active')}
+          onRestore={(id) => updateGoal(id, { status: 'active', completedAt: null })}
+          onDelete={(id, title) => {
+            if (window.confirm(`Permanently delete "${title}"? This cannot be undone.`)) deleteGoal(id)
+          }}
+        />
       )}
 
       {/* ── Modals ── */}
