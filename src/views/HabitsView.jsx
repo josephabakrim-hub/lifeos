@@ -470,25 +470,25 @@ function HabitCard({ habit, logs, today, toggleHabitLog, onEdit, onArchive, onDe
   return (
     <>
       <div className="card" style={{ borderLeft: `3px solid ${habit.color || 'var(--accent)'}`, opacity: isScheduledToday ? 1 : 0.55 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
           <button
             className={`habit-toggle ${isDone ? 'done' : ''}`}
-            style={{ borderColor: isDone ? habit.color : 'var(--border2)', background: isDone ? habit.color : 'transparent', cursor: isScheduledToday ? 'pointer' : 'not-allowed' }}
+            style={{ borderColor: isDone ? habit.color : 'var(--border2)', background: isDone ? habit.color : 'transparent', cursor: isScheduledToday ? 'pointer' : 'not-allowed', flexShrink: 0, marginTop: 2 }}
             onClick={() => isScheduledToday && toggleHabitLog(habit.id)}
             title={isScheduledToday ? undefined : `Not scheduled today — ${scheduleLabel(scheduledDays)}`}
           >
             {isDone ? '✓' : ''}
           </button>
-          <span style={{ fontSize: 24 }}>{habit.icon}</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 600, fontSize: 15, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? 'var(--text3)' : 'var(--text)' }}>{habit.name}</div>
-            {habit.description && <div style={{ fontSize: 12, color: 'var(--text3)' }}>{habit.description}</div>}
+          <span style={{ fontSize: 24, flexShrink: 0, marginTop: 2 }}>{habit.icon}</span>
+          <div style={{ flex: 1, minWidth: 0, minWidth: 120 }}>
+            <div style={{ fontWeight: 600, fontSize: 15, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? 'var(--text3)' : 'var(--text)', wordBreak: 'break-word' }}>{habit.name}</div>
+            {habit.description && <div style={{ fontSize: 12, color: 'var(--text3)', wordBreak: 'break-word', lineHeight: 1.4 }}>{habit.description}</div>}
             <div style={{ fontSize: 11, marginTop: 2 }}>
               <span style={{ color: 'var(--text3)' }}>📅 {scheduleLabel(scheduledDays)}</span>
               {!isScheduledToday && <span style={{ color: 'var(--amber)', fontWeight: 600, marginLeft: 6 }}>· Off today</span>}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
             {streak > 0 && <span className="streak">🔥 {streak}d</span>}
             <span className="badge badge-blue">{rate30}% / 30d</span>
             <button className="btn btn-sm" onClick={onEdit}>✏️</button>
