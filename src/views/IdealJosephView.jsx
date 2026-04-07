@@ -2,6 +2,18 @@ import { useState, useMemo } from 'react'
 import { IDEAL_WEEKLY_BENCHMARKS, IDEAL_NAME, calcIdealLifeScore, PILLAR_WEIGHTS, getCatchUpPlan, getGapStatus } from '../lib/idealJoseph'
 import { scoreColor } from '../lib/utils'
 
+// ── Fix 4: Specific fitness gap translation ──────────────────────────────────
+// Instead of a meaningless "X minutes of training", tell the user exactly
+// what they need: resistance sessions and/or Zone 2 minutes
+function getFitnessGapText(gap, actualScore) {
+  const resNeeded  = actualScore < 35 ? '1–2 more resistance sessions' : null
+  const zone2Needed = actualScore < 70 ? '45–90 more Zone 2 minutes (or HIIT/jogging)' : null
+  const sleepNeeded = actualScore < 90 ? '7.5h sleep logged each day' : null
+  const parts = [resNeeded, zone2Needed, sleepNeeded].filter(Boolean)
+  if (!parts.length) return `${gap} points — you're close, stay consistent`
+  return parts.join(' + ')
+}
+
 const PILLARS = [
   { key: 'habits',   label: 'Habits',   icon: '🧠', color: '#14b8a6' },
   { key: 'weekly',   label: 'Weekly',   icon: '📅', color: '#3b82f6' },
@@ -388,8 +400,8 @@ export default function IdealJosephView({ pillarScores, lifeScore, weeklyHistory
                 {p.icon} <strong>{p.label}:</strong>{' '}
                 <span style={{ color: gap <= 10 ? 'var(--amber)' : 'var(--red)' }}>
                   {IDEAL_NAME} scored {ideal}. You scored {actual}. That's {gap} points and roughly{' '}
-                  {p.key === 'fitness'  ? `${Math.round(gap * 1.35)} minutes of training` :
-                   p.key === 'learning' ? `${(gap * 0.07).toFixed(1)} hours of learning` :
+                  {p.key === 'fitness'  ? getFitnessGapText(gap, pillarScores.fitness) :
+                   p.key === 'learning' ? `${(gap * 0.07).toFixed(1)} hours of deep learning` :
                    p.key === 'habits'   ? `${Math.round(gap / 14)} habit misses per day` :
                    `${gap} execution points`} left on the table.
                 </span>

@@ -73,18 +73,81 @@ export function useFitness() {
   }
 
   function getWeekScore() {
-    const ww = getWeekWorkouts()
-    // Return 0 immediately if nothing has been logged this week
-    if (!ww.length && !metrics.length) return 0
+    const ww        = getWeekWorkouts()
+    const weekStart = getWeekStart()
 
-    const resistance  = ww.filter(w => w.type === 'resistance').length
-    const zone2Mins   = ww.filter(w => w.type === 'zone2').reduce((acc, w) => acc + (w.duration || 0), 0)
-    const todayM      = metrics.find(m => m.date === formatDate())
-    // Only count sleep if it was actually logged — no phantom 50 default
-    const sleepScore  = todayM?.sleep ? Math.min(100, (todayM.sleep / 7.5) * 100) : 0
-    const resScore    = Math.min(100, (resistance / 3) * 100)
-    const zone2Score  = Math.min(100, (zone2Mins / 135) * 100)
+    // Return 0 if absolutely nothing logged this week
+    const weekMetrics = metrics.filter(m => m.date >= weekStart)
+    if (!ww.length && !weekMetrics.length) return 0
+
+    // ── Fix 1: Resistance ────────────────────────────────────────────────────
+    // Pure resistance training counts fully (target: 3/week)
+    // Calisthenics (pull-ups, push-ups, dips, sit-ups) counts as 0.5 resistance each
+    const resistanceFull  = ww.filter(w => w.type === 'resistance').length
+    const calisthenicsHalf = ww.filter(w => ['pullups','pushups','dips','situps'].includes(w.type)).length * 0.5
+    const resistance      = resistanceFull + calisthenicsHalf
+    const resScore        = Math.min(100, (resistance / 3) * 100)
+
+    // ── Fix 2: Zone 2 / Cardio ───────────────────────────────────────────────
+    // Zone 2 cardio counts fully (target: 135 min/week)
+    // HIIT counts as Zone 2 equivalent (Huberman: HIIT can substitute Zone 2)
+    // Jogging counts as Zone 2 (it IS Zone 2 for most people)
+    // Walk counts at 50% (lower intensity, still aerobic benefit)
+    const zone2Mins = ww.reduce((acc, w) => {
+      if (['zone2', 'hiit', 'jogging'].includes(w.type)) return acc + (w.duration || 0)
+      if (w.type === 'walk')                              return acc + (w.duration || 0) * 0.5
+      return acc
+    }, 0)
+    const zone2Score = Math.min(100, (zone2Mins / 135) * 100)
+
+    // ── Fix 3: Sleep — weekly average, not just today ────────────────────────
+    // Average all sleep entries logged this week, not just today's
+    // If none logged yet, sleep doesn't zero the score — it's excluded
+    const sleepEntries = weekMetrics.filter(m => m.sleep)
+    const avgSleep     = sleepEntries.length
+      ? sleepEntries.reduce((a, m) => a + m.sleep, 0) / sleepEntries.length
+      : null
+    const sleepScore   = avgSleep !== null ? Math.min(100, (avgSleep / 7.5) * 100) : 0
+
+    // ── Weighted score ───────────────────────────────────────────────────────
+    // If sleep hasn't been logged at all this week, redistribute its weight
+    // so partial weeks aren't unfairly penalised
+    if (avgSleep === null) {
+      return Math.round(resScore * 0.5 + zone2Score * 0.5)
+    }
     return Math.round(resScore * 0.35 + zone2Score * 0.35 + sleepScore * 0.3)
+  }
+
+  // ── Fix 4: Expose week breakdown for the gap report ─────────────────────────
+  // Returns the raw components so IdealJosephView can give specific catch-up advice
+  function getWeekScoreBreakdown() {
+    const ww        = getWeekWorkouts()
+    const weekStart = getWeekStart()
+    const weekMetrics = metrics.filter(m => m.date >= weekStart)
+
+    const resistanceFull   = ww.filter(w => w.type === 'resistance').length
+    const calisthenicsHalf = ww.filter(w => ['pullups','pushups','dips','situps'].includes(w.type)).length * 0.5
+    const resistance       = resistanceFull + calisthenicsHalf
+
+    const zone2Mins = ww.reduce((acc, w) => {
+      if (['zone2', 'hiit', 'jogging'].includes(w.type)) return acc + (w.duration || 0)
+      if (w.type === 'walk')                              return acc + (w.duration || 0) * 0.5
+      return acc
+    }, 0)
+
+    const sleepEntries = weekMetrics.filter(m => m.sleep)
+    const avgSleep     = sleepEntries.length
+      ? sleepEntries.reduce((a, m) => a + m.sleep, 0) / sleepEntries.length
+      : null
+
+    return {
+      resistance,          // effective resistance sessions this week
+      resistanceFull,      // pure resistance sessions
+      calisthenicsHalf,    // calisthenics contribution
+      zone2Mins,           // effective Zone 2 minutes
+      avgSleep,            // average sleep hours logged this week (null if none)
+      sleepDaysLogged: sleepEntries.length,
+    }
   }
 
   function getLatestWeight() {
@@ -96,6 +159,6 @@ export function useFitness() {
     logWorkout, updateWorkout, deleteWorkout,
     logMetrics,
     logFood, updateFood, deleteFood,
-    getWeekWorkouts, getWeekScore, getLatestWeight,
+    getWeekWorkouts, getWeekScore, getWeekScoreBreakdown, getLatestWeight,
   }
 }
