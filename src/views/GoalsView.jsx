@@ -435,7 +435,7 @@ function MilestoneBlock({ milestone, milestoneIndex, goalId, onToggleMilestone, 
   const tasks     = milestone.tasks || []
   const doneTasks = tasks.filter(t => t.done).length
   const mDays     = milestone.dueDate ? getCountdown(milestone.dueDate) : null
-  const dl        = deadlineLabel(mDays)
+  const dl        = milestone.done ? null : deadlineLabel(mDays)
 
   return (
     <div style={{ marginBottom: 2 }}>
@@ -592,7 +592,7 @@ function GoalCard({
   const hasWOOP        = !!goal.woop?.wish
 
   // Determine status label
-  const statusLabel = isOverdue ? { text: 'Overdue', color: '#ef4444', bg: 'rgba(239,68,68,0.1)' }
+  const statusLabel = (isOverdue && progress < 100) ? { text: 'Overdue', color: '#ef4444', bg: 'rgba(239,68,68,0.1)' }
     : progress >= 75 ? { text: 'On track', color: '#22c55e', bg: 'rgba(34,197,94,0.1)' }
     : progress >= 40 ? { text: 'In progress', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' }
     : { text: 'Just started', color: '#9898b0', bg: 'rgba(152,152,176,0.1)' }
@@ -746,7 +746,7 @@ function GoalCard({
           {/* Deadline timeline */}
           {goal.targetDate && (() => {
             const days = getCountdown(goal.targetDate)
-            const isOv = days < 0
+            const isOv = days < 0 && progress < 100
             const start = new Date(goal.createdAt || Date.now())
             const end = new Date(goal.targetDate)
             const total = Math.max(1, Math.round((end - start) / 86400000))
@@ -1238,8 +1238,8 @@ export default function GoalsView({
 
       {/* Overdue banner */}
       {(() => {
-        const overdue  = activeGoals.filter(g => { const d = getCountdown(g.targetDate); return d !== null && d < 0 })
-        const critical = activeGoals.filter(g => { const d = getCountdown(g.targetDate); return d !== null && d >= 0 && d <= 3 })
+        const overdue  = activeGoals.filter(g => { const d = getCountdown(g.targetDate); return d !== null && d < 0 && (g.progress || 0) < 100 })
+        const critical = activeGoals.filter(g => { const d = getCountdown(g.targetDate); return d !== null && d >= 0 && d <= 3 && (g.progress || 0) < 100 })
         if (!overdue.length && !critical.length) return null
         return (
           <div style={{ padding: '12px 16px', marginBottom: 14, borderRadius: 10, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.3)' }}>
