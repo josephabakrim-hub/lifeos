@@ -590,6 +590,7 @@ function GoalCard({
   const doneTasks      = allTasks.filter(t => t.done).length
   const nextActionCount = milestones.flatMap(m => (m.tasks || []).filter(t => t.isNextAction && !t.done)).length
   const hasWOOP        = !!goal.woop?.wish
+  const [showOneThingLog, setShowOneThingLog] = useState(false)
 
   // Determine status label
   const statusLabel = (isOverdue && progress < 100) ? { text: 'Overdue', color: '#ef4444', bg: 'rgba(239,68,68,0.1)' }
@@ -810,13 +811,23 @@ function GoalCard({
             </div>
           )}
 
-          {/* ONE Thing log */}
+          {/* ONE Thing log — toggleable */}
           {goal.oneThing?.length > 0 && (
             <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-                ONE Thing Log
-              </div>
-              {goal.oneThing.slice(0, 5).map((o, i) => (
+              <button
+                onClick={() => setShowOneThingLog(p => !p)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '6px 0', marginBottom: showOneThingLog ? 8 : 0,
+                }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  🎯 ONE Thing Log <span style={{ fontWeight: 400, opacity: 0.6 }}>({goal.oneThing.length})</span>
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--text3)' }}>{showOneThingLog ? '▲ hide' : '▼ show'}</span>
+              </button>
+              {showOneThingLog && goal.oneThing.map((o, i) => (
                 <div key={i} style={{ display: 'flex', gap: 10, padding: '5px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
                   <span style={{ color: 'var(--text3)', flexShrink: 0 }}>{o.date}</span>
                   <span style={{ color: 'var(--text2)' }}>{o.text}</span>
@@ -1202,15 +1213,16 @@ export default function GoalsView({
       {activeGoals.length > 0 && (
         <div style={{ display: 'flex', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
           {[
-            { label: 'Active goals',  value: activeGoals.length,                            color: '#9f91ff' },
-            { label: 'Next actions',  value: nextActions.length,                            color: '#9f91ff' },
-            { label: 'Avg progress',  value: Math.round(activeGoals.reduce((a,g) => a+(g.progress||0),0)/activeGoals.length)+'%', color: scoreColor(Math.round(activeGoals.reduce((a,g)=>a+(g.progress||0),0)/activeGoals.length)) },
-            { label: 'WOOP complete', value: activeGoals.filter(g=>g.woop?.wish).length+'/'+activeGoals.length, color: '#a855f7' },
-            { label: 'Total tasks',   value: (() => { const all=activeGoals.flatMap(g=>(g.milestones||[]).flatMap(m=>m.tasks||[])); return `${all.filter(t=>t.done).length}/${all.length}` })(), color: '#22c55e' },
+            { label: 'Active goals',  value: activeGoals.length,                            color: '#9f91ff', sub: 'goals tracked' },
+            { label: 'Next actions',  value: nextActions.length,                            color: '#9f91ff', sub: 'ready to act' },
+            { label: 'Avg progress',  value: Math.round(activeGoals.reduce((a,g) => a+(g.progress||0),0)/activeGoals.length)+'%', color: scoreColor(Math.round(activeGoals.reduce((a,g)=>a+(g.progress||0),0)/activeGoals.length)), sub: 'across all goals' },
+            { label: 'WOOP complete', value: activeGoals.filter(g=>g.woop?.wish).length+'/'+activeGoals.length, color: '#a855f7', sub: 'anti-quit plans' },
+            { label: 'Total tasks',   value: (() => { const all=activeGoals.flatMap(g=>(g.milestones||[]).flatMap(m=>m.tasks||[])); return `${all.filter(t=>t.done).length}/${all.length}` })(), color: '#22c55e', sub: 'tasks done' },
           ].map(s => (
-            <div key={s.label} style={{ padding: '8px 14px', borderRadius: 10, background: 'var(--bg2)', border: '1px solid var(--border)', flex: 1, minWidth: 100, textAlign: 'center' }}>
-              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-display)', color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.4 }}>{s.label}</div>
+            <div key={s.label} style={{ padding: '16px 14px', borderRadius: 10, background: 'var(--bg2)', border: '1px solid var(--border)', flex: 1, minWidth: 100, textAlign: 'center' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 800, color: s.color, lineHeight: 1.1 }}>{s.value}</div>
+              <div style={{ fontSize: 13, color: 'var(--text3)', marginTop: 6 }}>{s.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4, opacity: 0.6 }}>{s.sub}</div>
             </div>
           ))}
         </div>
