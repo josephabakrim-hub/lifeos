@@ -11,6 +11,13 @@ import { formatDate } from '../lib/utils'
 
 const CATEGORIES = [
   {
+    id:    'family',
+    label: 'Family',
+    icon:  '👨‍👩‍👧',
+    color: '#14b8a6',
+    desc:  'Biological or chosen family — unconditional by nature, not choice',
+  },
+  {
     id:    'inner',
     label: 'Inner Circle',
     icon:  '💛',
@@ -37,13 +44,6 @@ const CATEGORIES = [
     icon:  '🌐',
     color: '#3b82f6',
     desc:  'Weak ties with real value — Granovetter: these bring you opportunities & new info',
-  },
-  {
-    id:    'family',
-    label: 'Family',
-    icon:  '👨‍👩‍👧',
-    color: '#14b8a6',
-    desc:  'Biological or chosen family — unconditional by nature, not choice',
   },
   {
     id:    'professional',
@@ -233,13 +233,23 @@ function ReflectionModal({ onClose, onSave, existing, people }) {
 
 // ─── My People section ────────────────────────────────────────────────────────
 
-function MyPeople({ people, addPerson, updatePerson, deletePerson, archivePerson, unarchivePerson, markContacted }) {
+function MyPeople({ people, addPerson, updatePerson, deletePerson, archivePerson, unarchivePerson, markContacted, saveLog, getCurrentLog }) {
   const [showModal,    setShowModal]    = useState(false)
   const [editPerson,   setEditPerson]   = useState(null)
   const [openCats,     setOpenCats]     = useState(() => new Set())
   const [movingId,     setMovingId]     = useState(null) // person id being moved
 
   const today = formatDate()
+
+  // Mark contacted today AND auto-add to this week's reflection contactedIds
+  async function handleMarkContacted(personId) {
+    await markContacted(personId)
+    const currentLog = getCurrentLog()
+    const existingIds = currentLog?.contactedIds || []
+    if (!existingIds.includes(personId)) {
+      await saveLog({ ...(currentLog || {}), contactedIds: [...existingIds, personId] })
+    }
+  }
 
   function daysSince(dateStr) {
     if (!dateStr) return 999
@@ -355,7 +365,7 @@ function MyPeople({ people, addPerson, updatePerson, deletePerson, archivePerson
                               </div>
                             </div>
                             <div style={{ display: 'flex', gap: 5, flexShrink: 0, alignItems: 'center' }}>
-                              <button className="btn btn-sm" style={{ color: 'var(--green)', borderColor: 'var(--green)' }} title="Mark as contacted today" onClick={() => markContacted(p.id)}>📞</button>
+                              <button className="btn btn-sm" style={{ color: 'var(--green)', borderColor: 'var(--green)' }} title="Mark as contacted today" onClick={() => handleMarkContacted(p.id)}>📞</button>
                               <MoveDropdown person={p} />
                               <button className="btn btn-sm" title="Edit" onClick={() => { setEditPerson(p); setShowModal(true) }}>✏️</button>
                               <button className="btn btn-sm" title="Archive" style={{ color: 'var(--amber)', borderColor: 'var(--amber)' }} onClick={() => archivePerson(p.id)}>📦</button>
@@ -545,16 +555,28 @@ function SocialCalendar({ logs, people, saveLog, deleteLog }) {
 
   const QUALITY_LABELS = { 1: '😞 Very poor', 2: '😐 Poor', 3: '🙂 Okay', 4: '😊 Good', 5: '🌟 Great' }
 
-  // Save an edited historical log back to its specific doc
+  // Save an edited or new historical log for a specific week
   async function handleEditSave(data) {
     if (!editLog) return
-    const { doc, updateDoc } = await import('firebase/firestore')
-    const { db } = await import('../lib/firebase')
-    await updateDoc(doc(db, 'lo_social_logs', editLog.id), {
-      ...data,
-      updatedAt: new Date().toISOString(),
-    })
+    // New log for a past week (no id yet)
+    if (editLog._newForWeek) {
+      const { addDoc, collection } = await import('firebase/firestore')
+      const { db } = await import('../lib/firebase')
+      await addDoc(collection(db, 'lo_social_logs'), {
+        ...data,
+        weekStart: editLog._newForWeek,
+        createdAt: new Date().toISOString(),
+      })
+    } else {
+      const { doc, updateDoc } = await import('firebase/firestore')
+      const { db } = await import('../lib/firebase')
+      await updateDoc(doc(db, 'lo_social_logs', editLog.id), {
+        ...data,
+        updatedAt: new Date().toISOString(),
+      })
+    }
     setEditLog(null)
+    setDayPopup(null)
   }
 
   return (
@@ -586,40 +608,66 @@ function SocialCalendar({ logs, people, saveLog, deleteLog }) {
           const log      = logByWeekStart[ws]
           const isToday  = dateStr === formatDate()
           const isActive = dayPopup && weekStartFor(dayPopup) === ws
+          const isFuture = dateStr > formatDate()
           const dotColor = log
             ? (log.quality >= 4 ? 'var(--green)' : log.quality >= 3 ? 'var(--amber)' : 'var(--red)')
             : null
           return (
             <div
               key={day}
-              onClick={() => log && setDayPopup(dayPopup === dateStr ? null : dateStr)}
+              onClick={() => !isFuture && setDayPopup(dayPopup === dateStr ? null : dateStr)}
               style={{
                 minHeight: 38, borderRadius: 6, display: 'flex', flexDirection: 'column',
                 alignItems: 'center', justifyContent: 'center',
-                cursor: log ? 'pointer' : 'default',
+                cursor: isFuture ? 'default' : 'pointer',
                 background: isActive ? 'rgba(236,72,153,0.12)' : isToday ? 'var(--bg4)' : 'var(--bg3)',
                 border: `1px solid ${isActive ? '#ec4899' : isToday ? 'var(--border2)' : 'transparent'}`,
+                opacity: isFuture ? 0.3 : 1,
               }}
             >
               <span style={{ fontSize: 12, color: isToday ? 'var(--text)' : 'var(--text2)', fontWeight: isToday ? 700 : 400 }}>{day}</span>
               {dotColor && <div style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, marginTop: 2 }} />}
+              {!log && !isFuture && <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--border2)', marginTop: 2 }} />}
             </div>
           )
         })}
       </div>
 
-      {/* Popup — full reflection with edit + delete */}
+      {/* Popup — full reflection with edit + delete, or log button for empty weeks */}
       {dayPopup && (() => {
         const ws  = weekStartFor(dayPopup)
         const log = logByWeekStart[ws]
-        if (!log) return null
+        const weekLabel = new Date(ws).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
+        if (!log) {
+          return (
+            <div style={{ marginTop: 12, background: 'var(--bg2)', borderRadius: 8, border: '1px solid var(--border2)', padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', marginBottom: 4 }}>
+                    Week of {weekLabel}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)' }}>No reflection logged for this week.</div>
+                </div>
+                <button
+                  className="btn btn-primary"
+                  style={{ background: '#ec4899', borderColor: '#ec4899', flexShrink: 0 }}
+                  onClick={() => setEditLog({ _newForWeek: ws })}
+                >
+                  + Log this week
+                </button>
+              </div>
+            </div>
+          )
+        }
+
         const contactedPeople = (log.contactedIds || []).map(id => peopleMap[id]).filter(Boolean)
         return (
           <div style={{ marginTop: 12, background: 'var(--bg2)', borderRadius: 8, border: '1px solid var(--border2)', overflow: 'hidden' }}>
             {/* Popup header */}
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)' }}>
-                Week of {new Date(ws).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                Week of {weekLabel}
               </span>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button className="btn btn-sm" title="Edit this reflection" onClick={() => setEditLog(log)}>✏️ Edit</button>
@@ -865,6 +913,8 @@ export default function SocialView({ people, logs, loading, addPerson, updatePer
               archivePerson={archivePerson}
               unarchivePerson={unarchivePerson}
               markContacted={markContacted}
+              saveLog={saveLog}
+              getCurrentLog={getCurrentLog}
             />
           </div>
         </>

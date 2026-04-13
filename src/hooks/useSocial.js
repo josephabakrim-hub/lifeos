@@ -80,8 +80,8 @@ export function useSocial() {
     return logs.find(l => l.weekStart === getWeekStart()) || null
   }
 
-  async function saveLog(data) {
-    const ws = getWeekStart()
+  async function saveLog(data, weekStartOverride) {
+    const ws = weekStartOverride || getWeekStart()
     const existing = logs.find(l => l.weekStart === ws)
     if (existing) {
       await updateDoc(doc(db, 'lo_social_logs', existing.id), { ...data, updatedAt: new Date().toISOString() })
