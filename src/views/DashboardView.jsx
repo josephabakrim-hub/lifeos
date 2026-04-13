@@ -14,13 +14,13 @@ const PILLAR_META = [
 
 // What Ideal Joseph does every single day per pillar
 const DAILY_IDEAL = {
-  habits:   { label: 'All habits done',         desc: 'Every scheduled habit completed' },
-  weekly:   { label: 'Weekly plan active',       desc: 'Top 3 goals set for this week' },
-  fitness:  { label: 'Workout or check-in',      desc: 'Any workout logged today' },
-  mental:   { label: 'Morning check-in done',    desc: 'Intention + mood logged' },
-  social:   { label: 'Someone contacted',        desc: 'Reached out to at least one person' },
-  learning: { label: 'Learning session logged',  desc: 'At least one session today' },
-  goals:    { label: 'ONE Thing done',           desc: 'Next action on a goal completed' },
+  habits:   { label: 'All habits done',        desc: 'Every scheduled habit completed',    banner: 'Habits not fully done today — open Habits and check off what you can still complete right now.' },
+  weekly:   { label: 'Weekly plan active',      desc: 'Top 3 goals set for this week',     banner: 'No weekly plan set — takes 5 minutes. Go to Weekly and write your top 3 goals for this week.' },
+  fitness:  { label: 'Workout or check-in',     desc: 'Any workout logged today',          banner: 'No workout logged today — even a 20-min walk counts. Log it in Fitness and keep the streak alive.' },
+  mental:   { label: 'Morning check-in done',   desc: 'Intention + mood logged',           banner: 'Morning check-in not done yet — 2 minutes. Open Mental, set your intention, and log your mood.' },
+  social:   { label: 'Someone contacted',       desc: 'Reached out to at least one person',banner: 'No one contacted today — pick one person right now and send a message. Takes 30 seconds.' },
+  learning: { label: 'Learning session logged', desc: 'At least one session today',        banner: 'No learning logged today — read or study for 25 minutes and log it. One session keeps the habit alive.' },
+  goals:    { label: 'ONE Thing done',          desc: 'Next action on a goal completed',   banner: 'No goal action logged today — open Goals, find your ONE Thing, and do it before anything else.' },
 }
 
 function ScoreRing({ score, size = 80, color }) {
@@ -172,18 +172,31 @@ export default function DashboardView({ pillarScores, lifeScore, habitsData, wee
 
   return (
     <div className="fade-in">
-      {/* Catch-up banners */}
-      {catchupPillars.map(p => {
-        const plan = getCatchUpPlan(p.pillar, pillarScores[p.key] || 0)
-        if (!plan) return null
-        const gap = (IDEAL_WEEKLY_BENCHMARKS[p.pillar]?.score || 100) - (pillarScores[p.key] || 0)
-        return (
-          <div key={p.key} className="catchup-banner">
-            <h4>{isLateWeek && gap > 20 ? '⏰' : '🔴'} {isLateWeek ? 'End-of-week push' : 'Far behind'} — {p.label} ({gap} pts gap)</h4>
-            <p>{plan}</p>
-          </div>
-        )
-      })}
+      {/* Catch-up banners — daily or weekly depending on mode */}
+      {viewMode === 'daily'
+        ? dailyChecks
+            .filter(c => !c.done)
+            .map(c => {
+              const meta = PILLAR_META.find(p => p.key === c.key)
+              return (
+                <div key={c.key} className="catchup-banner" style={{ borderColor: 'rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.07)', cursor: 'pointer' }} onClick={() => onTabChange(meta.tab)}>
+                  <h4 style={{ color: 'var(--amber)' }}>○ Not done today — {meta.label}</h4>
+                  <p>{DAILY_IDEAL[c.key].banner}</p>
+                </div>
+              )
+            })
+        : catchupPillars.map(p => {
+            const plan = getCatchUpPlan(p.pillar, pillarScores[p.key] || 0)
+            if (!plan) return null
+            const gap = (IDEAL_WEEKLY_BENCHMARKS[p.pillar]?.score || 100) - (pillarScores[p.key] || 0)
+            return (
+              <div key={p.key} className="catchup-banner">
+                <h4>{isLateWeek && gap > 20 ? '⏰' : '🔴'} {isLateWeek ? 'End-of-week push' : 'Far behind'} — {p.label} ({gap} pts gap)</h4>
+                <p>{plan}</p>
+              </div>
+            )
+          })
+      }
 
       {/* Top row: Life Score + today snapshot */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 16, marginBottom: 16 }}>
