@@ -93,24 +93,44 @@ export function useSocial() {
   // ── Scores & insights ────────────────────────────────────────────────────────
 
   function getWeekScore() {
-    const current = getCurrentLog()
-    if (!current) return 0
+    const current   = getCurrentLog()
+    const weekStart = getWeekStart()
+    const weekEnd   = formatDate()
 
-    const reflectionDone = 20  // flat 20 pts for logging at all
+    // ── Part 1: Live contact score (30 pts max) ──────────────────────────────
+    // Derived from lastContacted on people — no reflection needed.
+    // Anyone contacted within this week (Mon–today) counts immediately.
+    const activePeople = people.filter(p => !p.archived)
+    const contactedThisWeek = activePeople.filter(
+      p => p.lastContacted && p.lastContacted >= weekStart && p.lastContacted <= weekEnd
+    )
+    // Also merge anyone in the log's contactedIds (manually selected in reflection)
+    const logContactedIds = current?.contactedIds || []
+    const allContactedIds = new Set([
+      ...contactedThisWeek.map(p => p.id),
+      ...logContactedIds,
+    ])
+    const totalContacted = allContactedIds.size
+    const target         = Math.max(1, Math.min(activePeople.length, 4))
+    const contactScore   = Math.min(30, Math.round((totalContacted / target) * 30))
+
+    // Category diversity bonus (up to 10 pts) — also live
+    const cats = new Set(
+      [...allContactedIds].map(id => activePeople.find(p => p.id === id)?.category).filter(Boolean)
+    )
+    const catsBonus = cats.size >= 4 ? 10 : cats.size >= 2 ? 5 : 0
+
+    // ── Part 2: Reflection score (60 pts max) — unlocks after saving ─────────
+    // 20 pts for doing the reflection, 30 pts for quality rating, 10 pts for met new
+    if (!current) {
+      return Math.min(100, contactScore + catsBonus)
+    }
+
+    const reflectionDone = 20
     const qualityScore   = current.quality ? Math.round((current.quality / 5) * 30) : 0
-
-    // People contacted this week
-    const contacted = (current.contactedIds || []).length
-    const target    = Math.max(1, Math.min(people.length, 4)) // aim to contact 1 per category
-    const contactScore = Math.min(30, Math.round((contacted / target) * 30))
-
-    // Bonus: met someone new
     const newPersonBonus = current.metNew ? 10 : 0
-    // Bonus: reached out to all 4 categories
-    const cats = new Set((current.contactedIds || []).map(id => people.find(p => p.id === id)?.category).filter(Boolean))
-    const allCatsBonus = cats.size >= 4 ? 10 : cats.size >= 2 ? 5 : 0
 
-    return Math.min(100, reflectionDone + qualityScore + contactScore + newPersonBonus + allCatsBonus)
+    return Math.min(100, contactScore + catsBonus + reflectionDone + qualityScore + newPersonBonus)
   }
 
   function getInsights() {
