@@ -25,6 +25,90 @@ const RECALL_LABELS = {
   5: { label: 'Perfect', sub: 'Clear and complete recall',  color: '#a855f7' },
 }
 
+// ─── Note formats ─────────────────────────────────────────────────────────────
+
+const NOTE_FORMATS = [
+  {
+    id: 'takeaways',
+    icon: '💡',
+    label: 'Key Takeaways',
+    short: 'Bullet insights',
+    description: 'Simple bullet-point insights. Best for any session — also drives spaced repetition recall.',
+    science: 'Elaborative interrogation',
+  },
+  {
+    id: 'cornell',
+    icon: '✏️',
+    label: 'Cornell Notes',
+    short: 'Cues + Notes',
+    description: 'Split into main notes + margin cues/questions you can cover to self-test later.',
+    science: 'Cornell University recall system',
+  },
+  {
+    id: 'feynman',
+    icon: '🧠',
+    label: 'Feynman Technique',
+    short: 'Explain simply',
+    description: 'Explain what you learned as if to a 12-year-old. Exposes gaps instantly.',
+    science: 'Richard Feynman — Nobel physicist',
+  },
+  {
+    id: 'sqr3',
+    icon: '❓',
+    label: 'SQ3R',
+    short: 'Question → Answer',
+    description: 'Survey → Question → Read → Recite → Review. Structured reading comprehension.',
+    science: 'Francis Robinson, 1946',
+  },
+  {
+    id: 'progressive',
+    icon: '📊',
+    label: 'Progressive Summary',
+    short: 'Layer highlights',
+    description: 'Layer 1: capture → Layer 2: bold the best → Layer 3: write the executive summary.',
+    science: 'Tiago Forte — Building a Second Brain',
+  },
+  {
+    id: 'conceptmap',
+    icon: '🗺️',
+    label: 'Concept Map',
+    short: 'Hub + connections',
+    description: 'Central idea + how other concepts connect to it. Forces relational thinking.',
+    science: 'Joseph Novak — Cornell, 1972',
+  },
+]
+
+function getNoteFormatById(id) {
+  return NOTE_FORMATS.find(f => f.id === id) || NOTE_FORMATS[0]
+}
+
+// Extract takeaways array from any note format (for recall/spaced repetition)
+function extractTakeaways(noteFormat, noteData) {
+  if (!noteData) return []
+  switch (noteFormat) {
+    case 'takeaways':
+      return (noteData.takeaways || '').split('\n').filter(t => t.trim())
+    case 'cornell':
+      return [
+        ...(noteData.cues || '').split('\n').filter(t => t.trim()),
+        ...(noteData.notes || '').split('\n').filter(t => t.trim()),
+      ].slice(0, 8)
+    case 'feynman':
+      return (noteData.explanation || '').split('\n').filter(t => t.trim()).slice(0, 5)
+    case 'sqr3':
+      return [noteData.question, noteData.answer, noteData.review].filter(Boolean)
+    case 'progressive':
+      return (noteData.summary || '').split('\n').filter(t => t.trim())
+    case 'conceptmap':
+      return [
+        noteData.centralIdea,
+        ...(noteData.connections || '').split('\n').filter(t => t.trim()),
+      ].filter(Boolean).slice(0, 6)
+    default:
+      return []
+  }
+}
+
 function typeIcon(value) {
   return TYPES.find(t => t.value === value)?.label?.split(' ')[0] || '📝'
 }
@@ -50,26 +134,611 @@ function daysUntilReview(nextReviewDate) {
   return Math.round((next - today) / 86400000)
 }
 
+// ─── Note format fields ───────────────────────────────────────────────────────
+
+function TakeawaysFields({ data, onChange }) {
+  return (
+    <div className="form-group">
+      <label>
+        Key takeaways
+        <span style={{ color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(one per line — used for recall practice)</span>
+      </label>
+      <textarea
+        value={data.takeaways || ''}
+        onChange={e => onChange({ ...data, takeaways: e.target.value })}
+        rows={4}
+        placeholder="What did you learn? One idea per line — you'll test yourself on these later."
+        style={{ resize: 'vertical' }}
+      />
+    </div>
+  )
+}
+
+function CornellFields({ data, onChange }) {
+  return (
+    <>
+      <div className="form-group">
+        <label>
+          📝 Main notes
+          <span style={{ color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(capture everything as you learn)</span>
+        </label>
+        <textarea
+          value={data.notes || ''}
+          onChange={e => onChange({ ...data, notes: e.target.value })}
+          rows={4}
+          placeholder="Write your main notes here — concepts, facts, ideas, examples..."
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+      <div className="form-group">
+        <label>
+          ❓ Cues / questions
+          <span style={{ color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(one per line — cover these to self-test later)</span>
+        </label>
+        <textarea
+          value={data.cues || ''}
+          onChange={e => onChange({ ...data, cues: e.target.value })}
+          rows={3}
+          placeholder="What questions does your main note answer? e.g. 'What is compound interest?'"
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+      <div className="form-group">
+        <label>
+          📋 Summary
+          <span style={{ color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(2–3 sentences, bottom of the page)</span>
+        </label>
+        <textarea
+          value={data.summary || ''}
+          onChange={e => onChange({ ...data, summary: e.target.value })}
+          rows={2}
+          placeholder="Summarise this session in your own words..."
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+    </>
+  )
+}
+
+function FeynmanFields({ data, onChange }) {
+  return (
+    <>
+      <div className="form-group">
+        <label>
+          🧠 Explain it simply
+          <span style={{ color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(write as if explaining to a 12-year-old)</span>
+        </label>
+        <textarea
+          value={data.explanation || ''}
+          onChange={e => onChange({ ...data, explanation: e.target.value })}
+          rows={5}
+          placeholder="What did you learn? Explain it in plain language, no jargon. If you can't explain it simply, you don't understand it yet..."
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+      <div className="form-group">
+        <label>
+          🚧 Gaps identified
+          <span style={{ color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(what was hard to explain? what do you still need to learn?)</span>
+        </label>
+        <textarea
+          value={data.gaps || ''}
+          onChange={e => onChange({ ...data, gaps: e.target.value })}
+          rows={2}
+          placeholder="Where did you get stuck or use jargon? That's what to study next..."
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+    </>
+  )
+}
+
+function SQR3Fields({ data, onChange }) {
+  return (
+    <>
+      <div className="form-group">
+        <label>❓ Question <span style={{ color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(what did you want to learn going in?)</span></label>
+        <input
+          value={data.question || ''}
+          onChange={e => onChange({ ...data, question: e.target.value })}
+          placeholder="e.g. How does the brain consolidate long-term memory?"
+        />
+      </div>
+      <div className="form-group">
+        <label>✅ Answer / key points <span style={{ color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(what did you find?)</span></label>
+        <textarea
+          value={data.answer || ''}
+          onChange={e => onChange({ ...data, answer: e.target.value })}
+          rows={3}
+          placeholder="Summarise the answer to your question and the main points..."
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+      <div className="form-group">
+        <label>🔄 Review <span style={{ color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(what would you still revisit or verify?)</span></label>
+        <textarea
+          value={data.review || ''}
+          onChange={e => onChange({ ...data, review: e.target.value })}
+          rows={2}
+          placeholder="What sections would you re-read? What still needs clarifying?"
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+    </>
+  )
+}
+
+function ProgressiveFields({ data, onChange }) {
+  return (
+    <>
+      <div className="form-group">
+        <label>
+          Layer 1 — Capture
+          <span style={{ color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(save anything that resonates)</span>
+        </label>
+        <textarea
+          value={data.layer1 || ''}
+          onChange={e => onChange({ ...data, layer1: e.target.value })}
+          rows={3}
+          placeholder="Paste or write the most interesting quotes, ideas, and passages..."
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+      <div className="form-group">
+        <label>
+          Layer 2 — Bold the best
+          <span style={{ color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(the most important 10–20%)</span>
+        </label>
+        <textarea
+          value={data.layer2 || ''}
+          onChange={e => onChange({ ...data, layer2: e.target.value })}
+          rows={3}
+          placeholder="From Layer 1, what are the most essential ideas? Write only those..."
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+      <div className="form-group">
+        <label>
+          Layer 3 — Executive summary
+          <span style={{ color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(your own words — 2 to 4 sentences)</span>
+        </label>
+        <textarea
+          value={data.summary || ''}
+          onChange={e => onChange({ ...data, summary: e.target.value })}
+          rows={2}
+          placeholder="Distil everything into a short paragraph. This is your permanent note."
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+    </>
+  )
+}
+
+function ConceptMapFields({ data, onChange }) {
+  return (
+    <>
+      <div className="form-group">
+        <label>🎯 Central idea <span style={{ color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(the core concept of this session)</span></label>
+        <input
+          value={data.centralIdea || ''}
+          onChange={e => onChange({ ...data, centralIdea: e.target.value })}
+          placeholder="e.g. Dopamine drives motivation, not pleasure"
+        />
+      </div>
+      <div className="form-group">
+        <label>
+          🔗 Connected concepts
+          <span style={{ color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(one per line — how does each connect to the central idea?)</span>
+        </label>
+        <textarea
+          value={data.connections || ''}
+          onChange={e => onChange({ ...data, connections: e.target.value })}
+          rows={4}
+          placeholder="e.g. Reward anticipation → dopamine spikes before, not during reward&#10;Habit loops → dopamine released on cue, not just reward&#10;Addiction → hijacks natural dopamine pathways"
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+      <div className="form-group">
+        <label>💬 Real-world application <span style={{ color: 'var(--text3)', fontWeight: 400, marginLeft: 6 }}>(how will you use this?)</span></label>
+        <input
+          value={data.application || ''}
+          onChange={e => onChange({ ...data, application: e.target.value })}
+          placeholder="e.g. Use implementation intentions to front-load the anticipation..."
+        />
+      </div>
+    </>
+  )
+}
+
+function NoteFormatFields({ format, data, onChange }) {
+  switch (format) {
+    case 'takeaways':   return <TakeawaysFields data={data} onChange={onChange} />
+    case 'cornell':     return <CornellFields data={data} onChange={onChange} />
+    case 'feynman':     return <FeynmanFields data={data} onChange={onChange} />
+    case 'sqr3':        return <SQR3Fields data={data} onChange={onChange} />
+    case 'progressive': return <ProgressiveFields data={data} onChange={onChange} />
+    case 'conceptmap':  return <ConceptMapFields data={data} onChange={onChange} />
+    default:            return <TakeawaysFields data={data} onChange={onChange} />
+  }
+}
+
+// ─── Display note content on card ────────────────────────────────────────────
+
+function NoteDisplay({ noteFormat, noteData, color }) {
+  if (!noteData) return null
+  const fmt = noteFormat || 'takeaways'
+
+  const rowStyle = {
+    display: 'flex', gap: 8, fontSize: 13, color: 'var(--text2)', marginBottom: 3,
+  }
+  const labelStyle = {
+    fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase',
+    letterSpacing: 0.5, marginBottom: 4, marginTop: 8,
+  }
+
+  switch (fmt) {
+    case 'takeaways': {
+      const lines = (noteData.takeaways || '').split('\n').filter(t => t.trim())
+      if (!lines.length) return null
+      return (
+        <div>
+          {lines.slice(0, 3).map((t, i) => (
+            <div key={i} style={rowStyle}>
+              <span style={{ color, flexShrink: 0 }}>💡</span><span>{t}</span>
+            </div>
+          ))}
+          {lines.length > 3 && (
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>+{lines.length - 3} more takeaways</div>
+          )}
+        </div>
+      )
+    }
+    case 'cornell': {
+      const cues  = (noteData.cues || '').split('\n').filter(t => t.trim())
+      const notes = (noteData.notes || '').split('\n').filter(t => t.trim())
+      return (
+        <div>
+          {cues.length > 0 && (
+            <>
+              <div style={labelStyle}>❓ Cues</div>
+              {cues.slice(0, 2).map((c, i) => (
+                <div key={i} style={rowStyle}><span style={{ color, flexShrink: 0 }}>→</span><span>{c}</span></div>
+              ))}
+            </>
+          )}
+          {notes.length > 0 && (
+            <>
+              <div style={labelStyle}>📝 Notes</div>
+              {notes.slice(0, 2).map((n, i) => (
+                <div key={i} style={rowStyle}><span style={{ color, flexShrink: 0 }}>·</span><span>{n}</span></div>
+              ))}
+            </>
+          )}
+          {noteData.summary && (
+            <>
+              <div style={labelStyle}>📋 Summary</div>
+              <div style={{ ...rowStyle, fontStyle: 'italic' }}>{noteData.summary}</div>
+            </>
+          )}
+        </div>
+      )
+    }
+    case 'feynman': {
+      const lines = (noteData.explanation || '').split('\n').filter(t => t.trim())
+      return (
+        <div>
+          <div style={labelStyle}>🧠 Simple explanation</div>
+          {lines.slice(0, 3).map((l, i) => (
+            <div key={i} style={rowStyle}><span style={{ color, flexShrink: 0 }}>→</span><span>{l}</span></div>
+          ))}
+          {noteData.gaps && (
+            <>
+              <div style={labelStyle}>🚧 Gaps to revisit</div>
+              <div style={{ ...rowStyle, color: '#f59e0b' }}>{noteData.gaps}</div>
+            </>
+          )}
+        </div>
+      )
+    }
+    case 'sqr3': {
+      return (
+        <div>
+          {noteData.question && (
+            <>
+              <div style={labelStyle}>❓ Question</div>
+              <div style={rowStyle}><span style={{ color, flexShrink: 0 }}>→</span><span>{noteData.question}</span></div>
+            </>
+          )}
+          {noteData.answer && (
+            <>
+              <div style={labelStyle}>✅ Answer</div>
+              <div style={{ ...rowStyle, whiteSpace: 'pre-wrap' }}>{noteData.answer.substring(0, 180)}{noteData.answer.length > 180 ? '…' : ''}</div>
+            </>
+          )}
+        </div>
+      )
+    }
+    case 'progressive': {
+      return (
+        <div>
+          {noteData.summary ? (
+            <>
+              <div style={labelStyle}>📊 Executive summary</div>
+              <div style={{ ...rowStyle, fontStyle: 'italic' }}>{noteData.summary}</div>
+            </>
+          ) : noteData.layer2 ? (
+            <>
+              <div style={labelStyle}>⭐ Best ideas</div>
+              <div style={rowStyle}>{noteData.layer2.substring(0, 200)}{noteData.layer2.length > 200 ? '…' : ''}</div>
+            </>
+          ) : null}
+        </div>
+      )
+    }
+    case 'conceptmap': {
+      const conns = (noteData.connections || '').split('\n').filter(t => t.trim())
+      return (
+        <div>
+          {noteData.centralIdea && (
+            <>
+              <div style={labelStyle}>🎯 Central idea</div>
+              <div style={{ ...rowStyle, fontWeight: 600 }}>{noteData.centralIdea}</div>
+            </>
+          )}
+          {conns.length > 0 && (
+            <>
+              <div style={labelStyle}>🔗 Connections</div>
+              {conns.slice(0, 3).map((c, i) => (
+                <div key={i} style={rowStyle}><span style={{ color, flexShrink: 0 }}>→</span><span>{c}</span></div>
+              ))}
+            </>
+          )}
+          {noteData.application && (
+            <>
+              <div style={labelStyle}>💬 Application</div>
+              <div style={{ ...rowStyle, color: 'var(--green)' }}>{noteData.application}</div>
+            </>
+          )}
+        </div>
+      )
+    }
+    default: return null
+  }
+}
+
+// ─── Note format picker ───────────────────────────────────────────────────────
+
+function NoteFormatPicker({ value, onChange }) {
+  const [showInfo, setShowInfo] = useState(null)
+
+  return (
+    <div className="form-group">
+      <label style={{ marginBottom: 8 }}>Note format</label>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 7 }}>
+        {NOTE_FORMATS.map(fmt => {
+          const active = value === fmt.id
+          return (
+            <div key={fmt.id} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => onChange(fmt.id)}
+                style={{
+                  width: '100%',
+                  padding: '9px 10px',
+                  borderRadius: 9,
+                  border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border2)'}`,
+                  background: active ? 'rgba(124,106,255,0.12)' : 'var(--bg3)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.12s',
+                }}
+              >
+                <div style={{ fontSize: 16, marginBottom: 2 }}>{fmt.icon}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: active ? 'var(--accent2)' : 'var(--text)', lineHeight: 1.2 }}>{fmt.label}</div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>{fmt.short}</div>
+              </button>
+              {/* Info tooltip trigger */}
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); setShowInfo(showInfo === fmt.id ? null : fmt.id) }}
+                style={{
+                  position: 'absolute', top: 6, right: 6,
+                  width: 16, height: 16, borderRadius: '50%',
+                  background: 'var(--bg4)', border: '1px solid var(--border2)',
+                  cursor: 'pointer', fontSize: 10, color: 'var(--text3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, lineHeight: 1,
+                }}
+              >?</button>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Info tooltip */}
+      {showInfo && (() => {
+        const fmt = NOTE_FORMATS.find(f => f.id === showInfo)
+        if (!fmt) return null
+        return (
+          <div style={{
+            marginTop: 8, padding: '10px 12px', borderRadius: 8,
+            background: 'var(--bg4)', border: '1px solid var(--border2)',
+            fontSize: 12, lineHeight: 1.6, color: 'var(--text2)',
+          }}>
+            <strong style={{ color: 'var(--text)' }}>{fmt.icon} {fmt.label}</strong>
+            <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--accent2)', fontWeight: 600 }}>Based on: {fmt.science}</span>
+            <div style={{ marginTop: 4 }}>{fmt.description}</div>
+          </div>
+        )
+      })()}
+    </div>
+  )
+}
+
+// ─── Full notes modal (view all) ──────────────────────────────────────────────
+
+function FullNotesModal({ item, onClose }) {
+  const fmt   = item.noteFormat || 'takeaways'
+  const color = topicColor(item.topic)
+  const fmtInfo = getNoteFormatById(fmt)
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <div className="modal-title" style={{ margin: 0 }}>{typeIcon(item.type)} {item.title}</div>
+          <button className="btn btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+          <span className="badge badge-blue" style={{ fontSize: 11 }}>{item.topic}</span>
+          <span style={{ fontSize: 12, color: 'var(--text3)' }}>{formatDuration(item.duration)} — {item.date}</span>
+          {item.applied && <span className="badge badge-green" style={{ fontSize: 11 }}>✓ Applied</span>}
+          <span style={{
+            fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+            background: 'rgba(124,106,255,0.1)', color: 'var(--accent2)',
+            border: '1px solid rgba(124,106,255,0.2)',
+          }}>
+            {fmtInfo.icon} {fmtInfo.label}
+          </span>
+        </div>
+
+        {/* Render full note content by format */}
+        {fmt === 'takeaways' && (() => {
+          const lines = (item.noteData?.takeaways || item.takeaways?.join('\n') || '').split('\n').filter(t => t.trim())
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {lines.map((t, i) => (
+                <div key={i} style={{ display: 'flex', gap: 10, padding: '10px 12px', background: 'var(--bg3)', borderRadius: 8, borderLeft: `3px solid ${color}`, fontSize: 14 }}>
+                  <span style={{ color, flexShrink: 0, fontWeight: 700 }}>{i + 1}.</span>
+                  <span>{t}</span>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
+
+        {fmt === 'cornell' && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>❓ Cues</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {(item.noteData?.cues || '').split('\n').filter(t => t.trim()).map((c, i) => (
+                  <div key={i} style={{ padding: '8px 10px', background: 'var(--bg3)', borderRadius: 7, borderLeft: `3px solid ${color}`, fontSize: 13, color: 'var(--text2)' }}>{c}</div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>📝 Notes</div>
+              <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7, whiteSpace: 'pre-wrap', padding: '8px 10px', background: 'var(--bg3)', borderRadius: 7 }}>{item.noteData?.notes}</div>
+            </div>
+            {item.noteData?.summary && (
+              <div style={{ gridColumn: '1 / -1', padding: '10px 12px', background: 'rgba(124,106,255,0.08)', borderRadius: 8, borderTop: '2px solid var(--accent)', fontSize: 13, color: 'var(--text2)', fontStyle: 'italic' }}>
+                <strong style={{ color: 'var(--text)', fontStyle: 'normal' }}>📋 Summary: </strong>{item.noteData.summary}
+              </div>
+            )}
+          </div>
+        )}
+
+        {fmt === 'feynman' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>🧠 Simple explanation</div>
+              <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.8, whiteSpace: 'pre-wrap', padding: '12px 14px', background: 'var(--bg3)', borderRadius: 8, borderLeft: `3px solid ${color}` }}>{item.noteData?.explanation}</div>
+            </div>
+            {item.noteData?.gaps && (
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>🚧 Gaps to revisit</div>
+                <div style={{ fontSize: 13, color: '#f59e0b', padding: '10px 12px', background: 'rgba(245,158,11,0.08)', borderRadius: 8, borderLeft: '3px solid #f59e0b' }}>{item.noteData.gaps}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {fmt === 'sqr3' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { key: 'question', icon: '❓', label: 'Question' },
+              { key: 'answer',   icon: '✅', label: 'Answer / Key points' },
+              { key: 'review',   icon: '🔄', label: 'Review' },
+            ].map(({ key, icon, label }) => item.noteData?.[key] && (
+              <div key={key} style={{ padding: '10px 12px', background: 'var(--bg3)', borderRadius: 8, borderLeft: `3px solid ${color}` }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text3)', marginBottom: 4 }}>{icon} {label}</div>
+                <div style={{ fontSize: 13, color: 'var(--text2)', whiteSpace: 'pre-wrap' }}>{item.noteData[key]}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {fmt === 'progressive' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { key: 'layer1',  icon: '1️⃣', label: 'Layer 1 — Capture',           color: 'var(--text3)' },
+              { key: 'layer2',  icon: '2️⃣', label: 'Layer 2 — Best ideas',         color: '#f59e0b' },
+              { key: 'summary', icon: '3️⃣', label: 'Layer 3 — Executive summary',  color: 'var(--accent2)' },
+            ].map(({ key, icon, label, color: lc }) => item.noteData?.[key] && (
+              <div key={key} style={{ padding: '10px 12px', background: 'var(--bg3)', borderRadius: 8, borderLeft: `3px solid ${lc}` }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: lc, marginBottom: 4 }}>{icon} {label}</div>
+                <div style={{ fontSize: 13, color: 'var(--text2)', whiteSpace: 'pre-wrap' }}>{item.noteData[key]}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {fmt === 'conceptmap' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {item.noteData?.centralIdea && (
+              <div style={{ textAlign: 'center', padding: '14px 16px', background: `${color}18`, borderRadius: 10, border: `2px solid ${color}`, fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+                🎯 {item.noteData.centralIdea}
+              </div>
+            )}
+            {(item.noteData?.connections || '').split('\n').filter(t => t.trim()).map((c, i) => (
+              <div key={i} style={{ padding: '8px 12px', background: 'var(--bg3)', borderRadius: 8, borderLeft: `3px solid ${color}`, fontSize: 13, color: 'var(--text2)', display: 'flex', gap: 8 }}>
+                <span style={{ color, fontWeight: 700 }}>→</span><span>{c}</span>
+              </div>
+            ))}
+            {item.noteData?.application && (
+              <div style={{ padding: '10px 12px', background: 'rgba(34,197,94,0.08)', borderRadius: 8, borderLeft: '3px solid var(--green)', fontSize: 13, color: 'var(--green)' }}>
+                <strong>💬 Application: </strong>{item.noteData.application}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Log session modal ────────────────────────────────────────────────────────
 
 function LearningModal({ onClose, onSave, editItem }) {
-  const [title,     setTitle]     = useState(editItem?.title    || '')
-  const [type,      setType]      = useState(editItem?.type     || 'book')
-  const [topic,     setTopic]     = useState(editItem?.topic    || 'Trading')
+  const [title,      setTitle]      = useState(editItem?.title    || '')
+  const [type,       setType]       = useState(editItem?.type     || 'book')
+  const [topic,      setTopic]      = useState(editItem?.topic    || 'Trading')
   const _stored     = editItem?.duration || 0
   const _storedMins = Math.round(_stored * 60)
-  const [durationH, setDurationH] = useState(_storedMins > 0 ? String(Math.floor(_storedMins / 60)) : '')
-  const [durationM, setDurationM] = useState(_storedMins > 0 ? String(_storedMins % 60) : '')
-  const [takeaways, setTakeaways] = useState(editItem?.takeaways?.join('\n') || '')
-  const [applied,   setApplied]   = useState(editItem?.applied  || false)
-  const [date,      setDate]      = useState(editItem?.date     || formatDate())
+  const [durationH,  setDurationH]  = useState(_storedMins > 0 ? String(Math.floor(_storedMins / 60)) : '')
+  const [durationM,  setDurationM]  = useState(_storedMins > 0 ? String(_storedMins % 60) : '')
+  const [applied,    setApplied]    = useState(editItem?.applied  || false)
+  const [date,       setDate]       = useState(editItem?.date     || formatDate())
+
+  // Note format state
+  const [noteFormat, setNoteFormat] = useState(editItem?.noteFormat || 'takeaways')
+  const [noteData,   setNoteData]   = useState(() => {
+    if (editItem?.noteData) return editItem.noteData
+    // Backwards compat: if old item has takeaways array, seed the field
+    if (editItem?.takeaways) return { takeaways: editItem.takeaways.join('\n') }
+    return {}
+  })
 
   function handleSave() {
     if (!title.trim()) return
+    const takeaways = extractTakeaways(noteFormat, noteData)
     onSave({
       title: title.trim(), type, topic,
       duration: (parseInt(durationH) || 0) + (parseInt(durationM) || 0) / 60,
-      takeaways: takeaways.split('\n').filter(t => t.trim()),
+      noteFormat,
+      noteData,
+      takeaways, // kept for spaced repetition compatibility
       applied, date,
     })
     onClose()
@@ -77,7 +746,7 @@ function LearningModal({ onClose, onSave, editItem }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
         <div className="modal-title">{editItem ? 'Edit session' : 'Log learning session'}</div>
         <div className="form-group">
           <label>Title / source</label>
@@ -117,11 +786,21 @@ function LearningModal({ onClose, onSave, editItem }) {
           <label>Date</label>
           <input type="date" value={date} onChange={e => setDate(e.target.value)} />
         </div>
-        <div className="form-group">
-          <label>Key takeaways <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(one per line — used for recall practice)</span></label>
-          <textarea value={takeaways} onChange={e => setTakeaways(e.target.value)} rows={4} placeholder="What did you learn? One idea per line — you'll test yourself on these later." style={{ resize: 'vertical' }} />
+
+        {/* ── Note format picker ── */}
+        <NoteFormatPicker value={noteFormat} onChange={id => { setNoteFormat(id); setNoteData({}) }} />
+
+        {/* ── Format-specific fields ── */}
+        <div style={{ padding: '14px 14px', background: 'var(--bg3)', borderRadius: 10, border: '1px solid var(--border2)', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+            <span style={{ fontSize: 15 }}>{getNoteFormatById(noteFormat).icon}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text2)' }}>{getNoteFormatById(noteFormat).label}</span>
+            <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 4 }}>— {getNoteFormatById(noteFormat).science}</span>
+          </div>
+          <NoteFormatFields format={noteFormat} data={noteData} onChange={setNoteData} />
         </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14 }}>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14, marginBottom: 4 }}>
           <div className={`checkbox ${applied ? 'checked' : ''}`} onClick={() => setApplied(!applied)}>
             {applied ? '✓' : ''}
           </div>
@@ -148,18 +827,22 @@ function RecallModal({ item, onClose, onSave }) {
     onClose()
   }
 
+  const takeaways = item.takeaways?.length > 0
+    ? item.takeaways
+    : extractTakeaways(item.noteFormat, item.noteData)
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
         <div className="modal-title">🔁 Recall check</div>
         <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg3)', borderLeft: `3px solid ${color}`, marginBottom: 20 }}>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>{typeIcon(item.type)} {item.title}</div>
-          <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: item.takeaways?.length ? 10 : 0 }}>
+          <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: takeaways?.length ? 10 : 0 }}>
             {item.topic} · Originally studied {item.date}
           </div>
-          {item.takeaways?.length > 0 && (
+          {takeaways?.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {item.takeaways.map((t, i) => (
+              {takeaways.map((t, i) => (
                 <div key={i} style={{ fontSize: 13, color: 'var(--text2)', display: 'flex', gap: 6 }}>
                   <span style={{ color }}>💡</span><span>{t}</span>
                 </div>
@@ -255,52 +938,25 @@ function CancelRecallModal({ item, onClose, onCancel }) {
   )
 }
 
-// ─── Full takeaways modal ─────────────────────────────────────────────────────
-
-function TakeawaysModal({ item, onClose }) {
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <div className="modal-title" style={{ margin: 0 }}>{typeIcon(item.type)} {item.title}</div>
-          <button className="btn btn-sm" onClick={onClose}>✕</button>
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <span className="badge badge-blue" style={{ fontSize: 11 }}>{item.topic}</span>
-          <span style={{ fontSize: 12, color: 'var(--text3)' }}>{formatDuration(item.duration)} — {item.date}</span>
-          {item.applied && <span className="badge badge-green" style={{ fontSize: 11 }}>✓ Applied</span>}
-        </div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          All takeaways ({item.takeaways.length})
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {item.takeaways.map((t, i) => (
-            <div key={i} style={{ display: 'flex', gap: 10, padding: '10px 12px', background: 'var(--bg3)', borderRadius: 8, borderLeft: `3px solid ${topicColor(item.topic)}`, fontSize: 14, color: 'var(--text)' }}>
-              <span style={{ color: topicColor(item.topic), flexShrink: 0, fontWeight: 700 }}>{i + 1}.</span>
-              <span>{t}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ─── Learning card ────────────────────────────────────────────────────────────
 
 function LearningCard({ item, onEdit, onDelete, onReview, onCancelReview }) {
-  const [expanded,      setExpanded]      = useState(false)
-  const [showAllModal,  setShowAllModal]  = useState(false)
+  const [showFullNotes, setShowFullNotes]  = useState(false)
   const [showRecall,    setShowRecall]    = useState(false)
   const [showCancel,    setShowCancel]    = useState(false)
   const color        = topicColor(item.topic)
-  const hasMoreThan2 = item.takeaways?.length > 2
   const daysLeft     = daysUntilReview(item.nextReviewDate)
   const isDue        = daysLeft !== null && daysLeft <= 0
   const isDueSoon    = daysLeft !== null && daysLeft > 0 && daysLeft <= 2
   const isFuture     = daysLeft !== null && daysLeft > 2
   const lastRecall   = item.lastRecallRating ? RECALL_LABELS[item.lastRecallRating] : null
   const reviewCount  = item.reviewHistory?.length || 0
+  const fmtInfo      = getNoteFormatById(item.noteFormat || 'takeaways')
+
+  // Determine if there are notes to show
+  const hasNotes = item.noteData
+    ? Object.values(item.noteData).some(v => v && String(v).trim())
+    : item.takeaways?.length > 0
 
   return (
     <>
@@ -330,11 +986,20 @@ function LearningCard({ item, onEdit, onDelete, onReview, onCancelReview }) {
             </div>
 
             {/* Meta row */}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: item.takeaways?.length ? 10 : 0 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: hasNotes ? 10 : 0 }}>
               <span className="badge" style={{ fontSize: 11, background: `${color}20`, color }}>{item.topic}</span>
               <span style={{ fontSize: 12, color: 'var(--text3)' }}>{formatDuration(item.duration)}</span>
               <span style={{ fontSize: 12, color: 'var(--text3)' }}>·</span>
               <span style={{ fontSize: 12, color: 'var(--text3)' }}>{item.date}</span>
+              {/* Note format badge */}
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+                padding: '1px 7px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+                background: 'rgba(124,106,255,0.08)', color: 'var(--accent2)',
+                border: '1px solid rgba(124,106,255,0.15)',
+              }}>
+                {fmtInfo.icon} {fmtInfo.label}
+              </span>
               {reviewCount > 0 && (
                 <>
                   <span style={{ fontSize: 12, color: 'var(--text3)' }}>·</span>
@@ -346,29 +1011,20 @@ function LearningCard({ item, onEdit, onDelete, onReview, onCancelReview }) {
               )}
             </div>
 
-            {/* Takeaways */}
-            {item.takeaways?.length > 0 && (
+            {/* Note preview */}
+            {hasNotes && (
               <div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {(expanded ? item.takeaways : item.takeaways.slice(0, 2)).map((t, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 8, fontSize: 13, color: 'var(--text2)' }}>
-                      <span style={{ color, flexShrink: 0 }}>💡</span>
-                      <span>{t}</span>
-                    </div>
-                  ))}
-                </div>
-                {hasMoreThan2 && (
-                  <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                    <button onClick={() => setExpanded(e => !e)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--accent)', fontWeight: 600, padding: 0 }}>
-                      {expanded ? '▲ Show less' : `▼ Show all ${item.takeaways.length} takeaways`}
-                    </button>
-                    {!expanded && (
-                      <button onClick={() => setShowAllModal(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text3)', fontWeight: 600, padding: 0 }}>
-                        ↗ Open full view
-                      </button>
-                    )}
-                  </div>
-                )}
+                <NoteDisplay
+                  noteFormat={item.noteFormat || 'takeaways'}
+                  noteData={item.noteData || (item.takeaways ? { takeaways: item.takeaways.join('\n') } : {})}
+                  color={color}
+                />
+                <button
+                  onClick={() => setShowFullNotes(true)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--accent)', fontWeight: 600, padding: '4px 0 0 0', marginTop: 4 }}
+                >
+                  ↗ View full notes
+                </button>
               </div>
             )}
           </div>
@@ -392,7 +1048,6 @@ function LearningCard({ item, onEdit, onDelete, onReview, onCancelReview }) {
             >
               🔁 {isDue ? 'Review now' : 'Recall check'}
             </button>
-            {/* Cancel / postpone — only shown if a review is scheduled */}
             {item.nextReviewDate && onCancelReview && (
               <button
                 onClick={() => setShowCancel(true)}
@@ -412,9 +1067,9 @@ function LearningCard({ item, onEdit, onDelete, onReview, onCancelReview }) {
         </div>
       </div>
 
-      {showAllModal && <TakeawaysModal item={item} onClose={() => setShowAllModal(false)} />}
-      {showRecall   && <RecallModal item={item} onClose={() => setShowRecall(false)} onSave={rating => onReview(item.id, rating)} />}
-      {showCancel   && <CancelRecallModal item={item} onClose={() => setShowCancel(false)} onCancel={onCancelReview} />}
+      {showFullNotes && <FullNotesModal item={item} onClose={() => setShowFullNotes(false)} />}
+      {showRecall    && <RecallModal item={item} onClose={() => setShowRecall(false)} onSave={rating => onReview(item.id, rating)} />}
+      {showCancel    && <CancelRecallModal item={item} onClose={() => setShowCancel(false)} onCancel={onCancelReview} />}
     </>
   )
 }
@@ -567,29 +1222,31 @@ function LearnHistory({ learnings, onEdit, onDelete, onReview, onCancelReview })
       {dayPopup && byDay[dayPopup] && (
         <div style={{ marginTop: 12, background: 'var(--bg2)', borderRadius: 8, padding: '12px 14px', border: '1px solid var(--border2)' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', marginBottom: 10 }}>{dayPopup}</div>
-          {byDay[dayPopup].map(item => (
-            <div key={item.id} style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--bg3)', borderLeft: `3px solid ${topicColor(item.topic)}`, marginBottom: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <span>{typeIcon(item.type)}</span>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>{item.title}</span>
-                {item.applied && <span className="badge badge-green" style={{ fontSize: 10 }}>✓ Applied</span>}
-              </div>
-              <div style={{ display: 'flex', gap: 8, marginBottom: item.takeaways?.length ? 8 : 0 }}>
-                <span className="badge badge-blue" style={{ fontSize: 10 }}>{item.topic}</span>
-                <span style={{ fontSize: 11, color: 'var(--text3)' }}>{formatDuration(item.duration)}</span>
-                {item.reviewHistory?.length > 0 && <span style={{ fontSize: 11, color: 'var(--text3)' }}>· {item.reviewHistory.length} recall{item.reviewHistory.length !== 1 ? 's' : ''}</span>}
-              </div>
-              {item.takeaways?.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {item.takeaways.map((t, i) => (
-                    <div key={i} style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', gap: 6 }}>
-                      <span style={{ color: topicColor(item.topic) }}>💡</span><span>{t}</span>
-                    </div>
-                  ))}
+          {byDay[dayPopup].map(item => {
+            const fmtInfo = getNoteFormatById(item.noteFormat || 'takeaways')
+            return (
+              <div key={item.id} style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--bg3)', borderLeft: `3px solid ${topicColor(item.topic)}`, marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span>{typeIcon(item.type)}</span>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{item.title}</span>
+                  {item.applied && <span className="badge badge-green" style={{ fontSize: 10 }}>✓ Applied</span>}
                 </div>
-              )}
-            </div>
-          ))}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                  <span className="badge badge-blue" style={{ fontSize: 10 }}>{item.topic}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text3)' }}>{formatDuration(item.duration)}</span>
+                  <span style={{ fontSize: 11, color: 'var(--accent2)', fontWeight: 600 }}>{fmtInfo.icon} {fmtInfo.label}</span>
+                  {item.reviewHistory?.length > 0 && <span style={{ fontSize: 11, color: 'var(--text3)' }}>· {item.reviewHistory.length} recall{item.reviewHistory.length !== 1 ? 's' : ''}</span>}
+                </div>
+                {(item.noteData || item.takeaways?.length > 0) && (
+                  <NoteDisplay
+                    noteFormat={item.noteFormat || 'takeaways'}
+                    noteData={item.noteData || (item.takeaways ? { takeaways: item.takeaways.join('\n') } : {})}
+                    color={topicColor(item.topic)}
+                  />
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -624,8 +1281,6 @@ export default function LearnView({
   const weekHours  = weekItems.reduce((acc, l) => acc + (l.duration || 0), 0)
   const dueItems   = getDueForReview ? getDueForReview() : []
   const dueCount   = dueItems.length
-
-  // Accurate count — uses reviewHistory entries this week only, not lastReviewDate
   const weekReviewCount = getWeekReviewCount ? getWeekReviewCount() : 0
 
   const allSessions = useMemo(() => {
@@ -677,7 +1332,7 @@ export default function LearnView({
         </div>
         <div className="card" style={{ textAlign: 'center' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 800, color: 'var(--blue)' }}>
-            {weekItems.filter(l => l.takeaways?.length > 0).length}
+            {weekItems.filter(l => l.noteData || l.takeaways?.length > 0).length}
           </div>
           <div style={{ fontSize: 13, color: 'var(--text3)' }}>Sessions with notes</div>
           <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Ideal: every session</div>
