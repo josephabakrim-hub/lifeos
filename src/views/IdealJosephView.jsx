@@ -50,79 +50,164 @@ function GapMeter({ actual, ideal, color }) {
 
 // ─── Progress curve chart (TradingView-style) ────────────────────────────────
 
-function BarCompareChart({ weeklyHistory = [], pillarScores, idealScore }) {
-  // Get last week's scores from history (second-to-last entry)
-  const lastWeek = weeklyHistory.length >= 2
-    ? weeklyHistory[weeklyHistory.length - 2]
-    : null
+// ─── Weekly candle bar chart ──────────────────────────────────────────────────
+// Each bar = one week's total Life Score. Score printed in the middle of the bar.
+// A horizontal gold dashed line sits at Ideal Joseph's score across the whole chart.
 
-  const bars = PILLARS.map(p => ({
-    ...p,
-    lastWeek: lastWeek?.pillars?.[p.key] ?? null,
-    current:  pillarScores[p.key] ?? 0,
-    ideal:    IDEAL_WEEKLY_BENCHMARKS[p.key]?.score ?? 100,
-  }))
+function WeeklyBarChart({ weeklyHistory = [], idealScore, extended }) {
+  const weeks = extended
+    ? weeklyHistory.slice(-30)
+    : weeklyHistory.slice(-12)
+
+  if (!weeks.length) {
+    return (
+      <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>
+        No weekly history yet — keep logging and bars will appear here.
+      </div>
+    )
+  }
+
+  // Chart dimensions
+  const CHART_H = 200   // total height of the bar area (0–100 scale)
+  const BAR_GAP = 6
 
   return (
-    <div style={{ marginTop: 16 }}>
-      <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14 }}>
-        Each pillar: last week · this week · Ideal Joseph target
-      </div>
-
+    <div style={{ marginTop: 4 }}>
       {/* Legend */}
-      <div style={{ display: 'flex', gap: 14, marginBottom: 16, fontSize: 11, color: 'var(--text3)', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 14, fontSize: 11, color: 'var(--text3)', flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--bg4)', display: 'inline-block', border: '1px solid var(--border2)' }} />
-          Last week
+          <span style={{ width: 16, height: 12, borderRadius: 3, background: 'linear-gradient(180deg,#9f91ff,#7c6aff)', display: 'inline-block' }} />
+          Weekly Life Score
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 12, height: 12, borderRadius: 3, background: 'linear-gradient(135deg,#9f91ff,#c084fc)', display: 'inline-block' }} />
-          This week (you)
-        </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 12, height: 12, borderRadius: 3, background: '#fbbf24', display: 'inline-block' }} />
-          Ideal Joseph
+          <span style={{ width: 18, borderTop: '2px dashed #fbbf24', display: 'inline-block' }} />
+          Ideal Joseph ({idealScore})
         </span>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {bars.map(b => (
-          <div key={b.key}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-              <span style={{ fontSize: 14 }}>{b.icon}</span>
-              <span style={{ fontSize: 12, fontWeight: 600, minWidth: 60 }}>{b.label}</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {/* Last week */}
-              {b.lastWeek !== null && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 60, fontSize: 10, color: 'var(--text3)', textAlign: 'right', flexShrink: 0 }}>Last wk</div>
-                  <div style={{ flex: 1, height: 8, background: 'var(--bg4)', borderRadius: 4, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${b.lastWeek}%`, background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 4, transition: 'width 0.6s ease' }} />
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text3)', width: 24, textAlign: 'right', flexShrink: 0 }}>{b.lastWeek}</div>
-                </div>
-              )}
-              {/* This week */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 60, fontSize: 10, color: 'var(--text3)', textAlign: 'right', flexShrink: 0 }}>This wk</div>
-                <div style={{ flex: 1, height: 8, background: 'var(--bg4)', borderRadius: 4, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${b.current}%`, background: `linear-gradient(90deg, #7c6aff, #c084fc)`, borderRadius: 4, transition: 'width 0.6s ease' }} />
-                </div>
-                <div style={{ fontSize: 11, color: '#9f91ff', fontWeight: 700, width: 24, textAlign: 'right', flexShrink: 0 }}>{b.current}</div>
-              </div>
-              {/* Ideal */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 60, fontSize: 10, color: '#fbbf24', textAlign: 'right', flexShrink: 0 }}>Ideal</div>
-                <div style={{ flex: 1, height: 8, background: 'var(--bg4)', borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
-                  <div style={{ height: '100%', width: `${b.ideal}%`, background: 'rgba(251,191,36,0.3)', borderRadius: 4, transition: 'width 0.6s ease' }} />
-                  <div style={{ position: 'absolute', top: 0, left: `${b.ideal}%`, transform: 'translateX(-1px)', width: 2, height: '100%', background: '#fbbf24', borderRadius: 1 }} />
-                </div>
-                <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 700, width: 24, textAlign: 'right', flexShrink: 0 }}>{b.ideal}</div>
-              </div>
-            </div>
+      {/* Scrollable bar area */}
+      <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
+        <div style={{
+          position: 'relative',
+          height: CHART_H + 40,  // +40 for x-axis labels
+          minWidth: weeks.length * 44,
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: BAR_GAP,
+          paddingBottom: 28,     // space for labels
+          paddingTop: 12,        // space above bars
+          boxSizing: 'border-box',
+        }}>
+
+          {/* Ideal Joseph horizontal line — spans full width */}
+          <div style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            // position from bottom: idealScore% of bar area
+            bottom: 28 + (idealScore / 100) * (CHART_H - 12),
+            borderTop: '2px dashed #fbbf24',
+            opacity: 0.85,
+            zIndex: 2,
+            pointerEvents: 'none',
+          }}>
+            <span style={{
+              position: 'absolute',
+              right: 0,
+              top: -16,
+              fontSize: 10,
+              fontWeight: 700,
+              color: '#fbbf24',
+              background: 'var(--bg)',
+              padding: '1px 4px',
+              borderRadius: 4,
+              whiteSpace: 'nowrap',
+            }}>
+              Ideal {idealScore}
+            </span>
           </div>
-        ))}
+
+          {/* Bars */}
+          {weeks.map((wk, i) => {
+            const score = wk.score ?? 0
+            const barH  = Math.max(24, (score / 100) * (CHART_H - 12))
+            const hitIdeal = score >= idealScore
+            const isCurrentWeek = i === weeks.length - 1
+
+            const label = new Date(wk.week + 'T12:00:00').toLocaleDateString('en-US', {
+              month: 'short', day: 'numeric',
+            })
+
+            return (
+              <div key={wk.week} style={{
+                flex: '1 0 36px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                position: 'relative',
+                height: '100%',
+              }}>
+                {/* Bar */}
+                <div style={{
+                  width: '100%',
+                  height: barH,
+                  borderRadius: '5px 5px 3px 3px',
+                  background: hitIdeal
+                    ? 'linear-gradient(180deg, #22c55e, #16a34a)'
+                    : isCurrentWeek
+                    ? 'linear-gradient(180deg, #c084fc, #7c6aff)'
+                    : 'linear-gradient(180deg, #9f91ff 0%, #6d5fff 100%)',
+                  opacity: isCurrentWeek ? 1 : 0.72,
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: isCurrentWeek ? '0 0 10px rgba(192,132,252,0.4)' : 'none',
+                  border: hitIdeal ? '1px solid rgba(34,197,94,0.5)' : isCurrentWeek ? '1px solid rgba(192,132,252,0.4)' : 'none',
+                  transition: 'height 0.5s ease',
+                  minHeight: 24,
+                  flexShrink: 0,
+                  zIndex: 1,
+                }}>
+                  {/* Score number in the middle of the bar */}
+                  <span style={{
+                    fontSize: barH > 32 ? 11 : 9,
+                    fontWeight: 800,
+                    color: '#fff',
+                    fontFamily: 'var(--font-display)',
+                    letterSpacing: -0.3,
+                    lineHeight: 1,
+                    textShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                    userSelect: 'none',
+                  }}>
+                    {score}
+                  </span>
+                  {/* ★ if hit ideal */}
+                  {hitIdeal && (
+                    <span style={{ position: 'absolute', top: -14, fontSize: 10 }}>⭐</span>
+                  )}
+                </div>
+
+                {/* X-axis label */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  fontSize: 9,
+                  color: isCurrentWeek ? '#c084fc' : 'var(--text3)',
+                  fontWeight: isCurrentWeek ? 700 : 400,
+                  textAlign: 'center',
+                  whiteSpace: 'nowrap',
+                  width: '100%',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}>
+                  {isCurrentWeek ? 'Now' : label}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
@@ -132,6 +217,7 @@ function ProgressCurveChart({ weeklyHistory = [], pillarScores, idealScore }) {
   const [timeframe, setTimeframe] = useState('weekly')
   const [hoveredIdx, setHoveredIdx] = useState(null)
   const [chartView, setChartView] = useState('curve') // 'curve' | 'bars'
+  const [extended, setExtended]   = useState(false)    // false=12wks, true=30wks
 
   // ── Build daily data from weeklyHistory pillar breakdowns ────────────────
   // We approximate daily by interpolating between weekly data points
@@ -280,7 +366,19 @@ function ProgressCurveChart({ weeklyHistory = [], pillarScores, idealScore }) {
 
       {/* Bar chart view */}
       {chartView === 'bars' && (
-        <BarCompareChart weeklyHistory={weeklyHistory} pillarScores={pillarScores} idealScore={idealScore} />
+        <>
+          <div style={{ display: 'flex', gap: 4, background: 'var(--bg3)', padding: 3, borderRadius: 8, border: '1px solid var(--border)', marginBottom: 12, alignSelf: 'flex-start', width: 'fit-content' }}>
+            <button onClick={() => setExtended(false)}
+              style={{ padding: '4px 14px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', background: !extended ? 'var(--accent)' : 'transparent', color: !extended ? '#fff' : 'var(--text3)', transition: 'all 0.15s' }}>
+              Last 12 wks
+            </button>
+            <button onClick={() => setExtended(true)}
+              style={{ padding: '4px 14px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', background: extended ? 'var(--accent)' : 'transparent', color: extended ? '#fff' : 'var(--text3)', transition: 'all 0.15s' }}>
+              Last 30 wks
+            </button>
+          </div>
+          <WeeklyBarChart weeklyHistory={weeklyHistory} idealScore={idealScore} extended={extended} />
+        </>
       )}
 
       {/* Curve view */}
