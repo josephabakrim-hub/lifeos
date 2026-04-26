@@ -8,8 +8,32 @@ import { formatDate, getWeekStart } from '../lib/utils'
 
 // Returns true if a habit is scheduled on the given dateStr
 // scheduledDays is an array of day numbers [0=Sun..6=Sat], default all days if absent
+// frequency can be 'weekly', 'biweekly', or 'monthly' for periodic habits
 export function isHabitScheduledOn(habit, dateStr) {
-  const days = habit.scheduledDays
+  const { frequency, anchorDay, anchorDate, scheduledDays } = habit
+
+  if (frequency === 'weekly') {
+    const dow = new Date(dateStr + 'T12:00:00').getDay()
+    return dow === (anchorDay ?? 1)
+  }
+
+  if (frequency === 'biweekly') {
+    const dow = new Date(dateStr + 'T12:00:00').getDay()
+    if (dow !== (anchorDay ?? 1)) return false
+    // Use the habit's createdAt or a fixed epoch Monday to determine even/odd weeks
+    const epoch = new Date('2025-01-06T12:00:00') // a known Monday
+    const target = new Date(dateStr + 'T12:00:00')
+    const weeksSinceEpoch = Math.floor((target - epoch) / (7 * 24 * 60 * 60 * 1000))
+    return weeksSinceEpoch % 2 === 0
+  }
+
+  if (frequency === 'monthly') {
+    const d = new Date(dateStr + 'T12:00:00')
+    return d.getDate() === (anchorDate ?? 1)
+  }
+
+  // Default: day-of-week based
+  const days = scheduledDays
   if (!days || days.length === 0) return true
   const dow = new Date(dateStr + 'T12:00:00').getDay()
   return days.includes(dow)

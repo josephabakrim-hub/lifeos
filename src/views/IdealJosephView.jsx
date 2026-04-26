@@ -48,221 +48,273 @@ function GapMeter({ actual, ideal, color }) {
   )
 }
 
-// ─── Weekly history chart ─────────────────────────────────────────────────────
+// ─── Progress curve chart (TradingView-style) ────────────────────────────────
 
-function WeeklyHistoryChart({ weeklyHistory = [], idealScore }) {
+function ProgressCurveChart({ weeklyHistory = [], pillarScores, idealScore }) {
+  const [timeframe, setTimeframe] = useState('weekly')
   const [hoveredIdx, setHoveredIdx] = useState(null)
 
-  if (!weeklyHistory || weeklyHistory.length === 0) return null
+  // ── Build daily data from weeklyHistory pillar breakdowns ────────────────
+  // We approximate daily by interpolating between weekly data points
+  const dailyData = useMemo(() => {
+    if (!weeklyHistory.length) return []
+    const points = []
+    weeklyHistory.forEach((wk, wi) => {
+      const weekStart = new Date(wk.week + 'T12:00:00')
+      for (let d = 0; d < 7; d++) {
+        const day = new Date(weekStart)
+        day.setDate(day.getDate() + d)
+        const dateStr = day.toISOString().split('T')[0]
+        const today = new Date().toISOString().split('T')[0]
+        if (dateStr > today) break
+        // Interpolate score across the week with slight natural variation
+        const nextScore = wi < weeklyHistory.length - 1 ? weeklyHistory[wi + 1].score : wk.score
+        const t = d / 6
+        const interpolated = Math.round(wk.score + (nextScore - wk.score) * t * 0.6)
+        points.push({ date: dateStr, score: Math.max(0, Math.min(100, interpolated)), label: day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) })
+      }
+    })
+    return points
+  }, [weeklyHistory])
 
-  // Chart dimensions
-  const BAR_W    = 32
-  const BAR_GAP  = 6
-  const HEIGHT   = 110
-  const IDEAL_Y  = Math.round((1 - idealScore / 100) * HEIGHT)
+  // ── Build monthly data ───────────────────────────────────────────────────
+  const monthlyData = useMemo(() => {
+    if (!weeklyHistory.length) return []
+    const byMonth = {}
+    weeklyHistory.forEach(wk => {
+      const d = new Date(wk.week + 'T12:00:00')
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      if (!byMonth[key]) byMonth[key] = []
+      byMonth[key].push(wk.score)
+    })
+    return Object.entries(byMonth).sort().map(([key, scores]) => {
+      const [year, month] = key.split('-')
+      const d = new Date(parseInt(year), parseInt(month) - 1, 1)
+      return {
+        date: key,
+        score: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
+        label: d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+      }
+    })
+  }, [weeklyHistory])
 
-  const maxScore = 100
-  const weeks = weeklyHistory
+  const weeklyData = useMemo(() => weeklyHistory.map(wk => ({
+    date: wk.week,
+    score: wk.score,
+    label: new Date(wk.week + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+  })), [weeklyHistory])
+
+  const data = timeframe === 'daily' ? dailyData : timeframe === 'weekly' ? weeklyData : monthlyData
+
+  if (!data.length) return null
+
+  // Chart layout
+  const W = 560, H = 160, PAD_L = 32, PAD_R = 24, PAD_T = 16, PAD_B = 28
+  const chartW = W - PAD_L - PAD_R
+  const chartH = H - PAD_T - PAD_B
+
+  const minScore = Math.max(0, Math.min(...data.map(d => d.score)) - 10)
+  const maxScore = Math.min(100, Math.max(...data.map(d => d.score)) + 10)
+  const range = maxScore - minScore || 10
+
+  function xPos(i) { return PAD_L + (i / Math.max(data.length - 1, 1)) * chartW }
+  function yPos(score) { return PAD_T + chartH - ((score - minScore) / range) * chartH }
+
+  // Build SVG path
+  const pts = data.map((d, i) => ({ x: xPos(i), y: yPos(d.score) }))
+
+  // Smooth curve using cubic bezier
+  function buildPath(points) {
+    if (!points.length) return ''
+    if (points.length === 1) return `M ${points[0].x} ${points[0].y}`
+    let d = `M ${points[0].x} ${points[0].y}`
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1]
+      const curr = points[i]
+      const cp1x = prev.x + (curr.x - prev.x) * 0.4
+      const cp1y = prev.y
+      const cp2x = curr.x - (curr.x - prev.x) * 0.4
+      const cp2y = curr.y
+      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`
+    }
+    return d
+  }
+
+  const linePath  = buildPath(pts)
+  const areaPath  = pts.length
+    ? linePath + ` L ${pts[pts.length - 1].x} ${PAD_T + chartH} L ${PAD_L} ${PAD_T + chartH} Z`
+    : ''
+
+  const idealY = yPos(Math.min(maxScore, Math.max(minScore, idealScore)))
 
   // Summary stats
-  const avg      = Math.round(weeks.reduce((s, w) => s + w.score, 0) / weeks.length)
-  const best     = Math.max(...weeks.map(w => w.score))
-  const trend    = weeks.length >= 2 ? weeks[weeks.length - 1].score - weeks[weeks.length - 2].score : 0
-  const beatIdeal = weeks.filter(w => w.score >= idealScore).length
+  const latest  = data[data.length - 1]?.score ?? 0
+  const avg     = Math.round(data.reduce((s, d) => s + d.score, 0) / data.length)
+  const best    = Math.max(...data.map(d => d.score))
+  const trend   = data.length >= 2 ? data[data.length - 1].score - data[data.length - 2].score : 0
 
-  function fmtWeek(weekStart) {
-    const d = new Date(weekStart + 'T12:00:00')
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
+  // X-axis labels: show up to 6 evenly spaced
+  const xLabelIndices = useMemo(() => {
+    if (data.length <= 6) return data.map((_, i) => i)
+    const step = Math.floor(data.length / 5)
+    const idxs = []
+    for (let i = 0; i < data.length; i += step) idxs.push(i)
+    if (!idxs.includes(data.length - 1)) idxs.push(data.length - 1)
+    return idxs
+  }, [data])
 
-  function barColor(score) {
-    if (score >= idealScore) return '#22c55e'
-    if (score >= idealScore - 15) return '#f59e0b'
-    return '#9f91ff'
-  }
-
-  const totalW = weeks.length * (BAR_W + BAR_GAP) - BAR_GAP
+  const hovered = hoveredIdx !== null ? data[hoveredIdx] : null
+  const hovX = hoveredIdx !== null ? xPos(hoveredIdx) : null
+  const hovY = hoveredIdx !== null ? yPos(data[hoveredIdx]?.score ?? 0) : null
 
   return (
     <div className="card" style={{ marginTop: 20, border: '1px solid rgba(251,191,36,0.15)', overflow: 'hidden' }}>
-
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <div className="card-title" style={{ margin: 0, marginBottom: 2 }}>📈 Your journey vs {IDEAL_NAME}</div>
-          <div style={{ fontSize: 12, color: 'var(--text3)' }}>Weekly Life Score history — last {weeks.length} week{weeks.length !== 1 ? 's' : ''}</div>
+          <div className="card-title" style={{ margin: 0, marginBottom: 2 }}>📈 Your progress curve</div>
+          <div style={{ fontSize: 12, color: 'var(--text3)' }}>Life Score over time vs Ideal Joseph</div>
         </div>
-        {/* Summary pills */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <div style={{ padding: '4px 10px', borderRadius: 20, background: 'var(--bg3)', border: '1px solid var(--border)', fontSize: 11 }}>
-            <span style={{ color: 'var(--text3)' }}>avg </span>
-            <span style={{ fontWeight: 700, color: scoreColor(avg) }}>{avg}</span>
-          </div>
-          <div style={{ padding: '4px 10px', borderRadius: 20, background: 'var(--bg3)', border: '1px solid var(--border)', fontSize: 11 }}>
-            <span style={{ color: 'var(--text3)' }}>best </span>
-            <span style={{ fontWeight: 700, color: '#22c55e' }}>{best}</span>
-          </div>
-          <div style={{ padding: '4px 10px', borderRadius: 20, background: 'var(--bg3)', border: '1px solid var(--border)', fontSize: 11 }}>
-            <span style={{ color: 'var(--text3)' }}>trend </span>
-            <span style={{ fontWeight: 700, color: trend >= 0 ? '#22c55e' : '#ef4444' }}>
-              {trend >= 0 ? '↑' : '↓'}{Math.abs(trend)}
-            </span>
-          </div>
-          {beatIdeal > 0 && (
-            <div style={{ padding: '4px 10px', borderRadius: 20, background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', fontSize: 11 }}>
-              <span style={{ color: '#fbbf24', fontWeight: 700 }}>★ {beatIdeal}× matched ideal</span>
-            </div>
-          )}
+        {/* Timeframe toggle */}
+        <div style={{ display: 'flex', gap: 4, background: 'var(--bg3)', padding: 3, borderRadius: 8, border: '1px solid var(--border)' }}>
+          {[{ id: 'daily', label: '1D' }, { id: 'weekly', label: '1W' }, { id: 'monthly', label: '1M' }].map(tf => (
+            <button key={tf.id} onClick={() => { setTimeframe(tf.id); setHoveredIdx(null) }}
+              style={{ padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', background: timeframe === tf.id ? 'var(--accent)' : 'transparent', color: timeframe === tf.id ? '#fff' : 'var(--text3)', transition: 'all 0.15s' }}>
+              {tf.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Chart */}
-      <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
-        <div style={{ position: 'relative', minWidth: totalW + 40, height: HEIGHT + 52, paddingLeft: 28 }}>
+      {/* Summary pills */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+        {[
+          { label: 'now', val: latest, color: '#9f91ff' },
+          { label: 'avg', val: avg, color: '#3b82f6' },
+          { label: 'best', val: best, color: '#22c55e' },
+          { label: 'trend', val: (trend >= 0 ? '+' : '') + trend, color: trend >= 0 ? '#22c55e' : '#ef4444' },
+        ].map(p => (
+          <div key={p.label} style={{ padding: '3px 10px', borderRadius: 20, background: 'var(--bg3)', border: '1px solid var(--border)', fontSize: 11 }}>
+            <span style={{ color: 'var(--text3)' }}>{p.label} </span>
+            <span style={{ fontWeight: 700, color: p.color }}>{p.val}</span>
+          </div>
+        ))}
+        {data.filter(d => d.score >= idealScore).length > 0 && (
+          <div style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', fontSize: 11 }}>
+            <span style={{ color: '#fbbf24', fontWeight: 700 }}>★ {data.filter(d => d.score >= idealScore).length}× at ideal</span>
+          </div>
+        )}
+      </div>
 
-          {/* Y-axis labels */}
+      {/* SVG Chart */}
+      <div style={{ overflowX: 'auto', cursor: 'crosshair' }}>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          style={{ width: '100%', minWidth: 320, display: 'block', userSelect: 'none' }}
+          onMouseLeave={() => setHoveredIdx(null)}
+          onMouseMove={e => {
+            const rect = e.currentTarget.getBoundingClientRect()
+            const svgX = ((e.clientX - rect.left) / rect.width) * W
+            const relX = svgX - PAD_L
+            if (relX < 0 || relX > chartW) { setHoveredIdx(null); return }
+            const idx = Math.round((relX / chartW) * (data.length - 1))
+            setHoveredIdx(Math.max(0, Math.min(data.length - 1, idx)))
+          }}
+        >
+          <defs>
+            <linearGradient id="curveGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#9f91ff" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="#9f91ff" stopOpacity="0.02" />
+            </linearGradient>
+            <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#7c6aff" />
+              <stop offset="100%" stopColor="#c084fc" />
+            </linearGradient>
+          </defs>
+
+          {/* Grid lines */}
           {[0, 25, 50, 75, 100].map(v => {
-            const y = Math.round((1 - v / 100) * HEIGHT)
+            if (v < minScore - 5 || v > maxScore + 5) return null
+            const y = yPos(v)
             return (
-              <div key={v} style={{ position: 'absolute', left: 0, top: y - 6, fontSize: 9, color: 'var(--text3)', width: 22, textAlign: 'right', lineHeight: 1 }}>
-                {v}
-              </div>
+              <g key={v}>
+                <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke="var(--border)" strokeWidth={0.5} strokeDasharray="3 4" />
+                <text x={PAD_L - 4} y={y + 4} fontSize={8} fill="var(--text3)" textAnchor="end">{v}</text>
+              </g>
             )
           })}
 
-          {/* Grid lines */}
-          <svg style={{ position: 'absolute', left: 28, top: 0, width: totalW, height: HEIGHT, overflow: 'visible' }}>
-            {[0, 25, 50, 75, 100].map(v => {
-              const y = Math.round((1 - v / 100) * HEIGHT)
-              return (
-                <line key={v} x1={0} y1={y} x2={totalW} y2={y}
-                  stroke={v === 0 || v === 100 ? 'var(--border2)' : 'var(--border)'}
-                  strokeWidth={1} strokeDasharray={v === 0 || v === 100 ? 'none' : '3 4'}
-                />
-              )
-            })}
+          {/* Ideal Joseph reference line */}
+          {idealY >= PAD_T && idealY <= PAD_T + chartH && (
+            <g>
+              <line x1={PAD_L} y1={idealY} x2={W - PAD_R} y2={idealY} stroke="#fbbf24" strokeWidth={1} strokeDasharray="5 3" opacity={0.7} />
+              <text x={W - PAD_R + 2} y={idealY + 4} fontSize={8} fill="#fbbf24" fontWeight="600">Ideal</text>
+            </g>
+          )}
 
-            {/* Ideal Joseph line */}
-            <line x1={0} y1={IDEAL_Y} x2={totalW} y2={IDEAL_Y}
-              stroke="#fbbf24" strokeWidth={1.5} strokeDasharray="5 3" opacity={0.8}
-            />
-            {/* Ideal label */}
-            <text x={totalW + 4} y={IDEAL_Y + 4} fontSize={9} fill="#fbbf24" fontWeight={600}>
-              Ideal
+          {/* Area fill */}
+          {areaPath && <path d={areaPath} fill="url(#curveGrad)" />}
+
+          {/* Curve line */}
+          {linePath && <path d={linePath} fill="none" stroke="url(#lineGrad)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />}
+
+          {/* Hover vertical line */}
+          {hovX !== null && (
+            <line x1={hovX} y1={PAD_T} x2={hovX} y2={PAD_T + chartH} stroke="var(--border2)" strokeWidth={1} strokeDasharray="2 2" />
+          )}
+
+          {/* Data dots — just endpoints + hover */}
+          {pts.length > 0 && (
+            <circle cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r={3} fill="#c084fc" />
+          )}
+          {hovX !== null && hovY !== null && (
+            <circle cx={hovX} cy={hovY} r={4} fill="#9f91ff" stroke="var(--bg)" strokeWidth={2} />
+          )}
+
+          {/* X-axis labels */}
+          {xLabelIndices.map(i => (
+            <text key={i} x={xPos(i)} y={H - 4} fontSize={8} fill={hoveredIdx === i ? '#9f91ff' : 'var(--text3)'} textAnchor="middle" fontWeight={hoveredIdx === i ? '700' : '400'}>
+              {data[i]?.label}
             </text>
-          </svg>
+          ))}
 
-          {/* Bars */}
-          <div style={{ position: 'absolute', left: 28, top: 0, display: 'flex', alignItems: 'flex-end', gap: BAR_GAP, height: HEIGHT }}>
-            {weeks.map((w, i) => {
-              const barH   = Math.max(4, Math.round((w.score / maxScore) * HEIGHT))
-              const color  = barColor(w.score)
-              const isHov  = hoveredIdx === i
-              const isLast = i === weeks.length - 1
-
-              return (
-                <div
-                  key={w.week}
-                  style={{ position: 'relative', width: BAR_W, flexShrink: 0, cursor: 'pointer' }}
-                  onMouseEnter={() => setHoveredIdx(i)}
-                  onMouseLeave={() => setHoveredIdx(null)}
-                >
-                  {/* Hover tooltip */}
-                  {isHov && (
-                    <div style={{
-                      position: 'absolute', bottom: barH + 8, left: '50%',
-                      transform: 'translateX(-50%)',
-                      background: 'var(--bg)', border: `1px solid ${color}`,
-                      borderRadius: 8, padding: '6px 10px', zIndex: 10,
-                      whiteSpace: 'nowrap', boxShadow: `0 4px 16px rgba(0,0,0,0.3)`,
-                      pointerEvents: 'none',
-                    }}>
-                      <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 2 }}>{fmtWeek(w.week)}</div>
-                      <div style={{ fontSize: 16, fontWeight: 800, color, fontFamily: 'var(--font-display)' }}>{w.score}</div>
-                      <div style={{ fontSize: 10, color: 'var(--text3)' }}>
-                        {w.score >= idealScore ? '✨ beat ideal' : `${idealScore - w.score} pts behind`}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Bar */}
-                  <div style={{
-                    width: BAR_W, height: barH,
-                    borderRadius: '4px 4px 0 0',
-                    background: isHov
-                      ? color
-                      : `linear-gradient(180deg, ${color}dd 0%, ${color}88 100%)`,
-                    transition: 'height 0.4s ease, opacity 0.15s',
-                    opacity: hoveredIdx !== null && !isHov ? 0.45 : 1,
-                    position: 'relative',
-                  }}>
-                    {/* Score label on bar if tall enough */}
-                    {barH > 28 && (
-                      <div style={{
-                        position: 'absolute', top: 6, left: 0, right: 0,
-                        textAlign: 'center', fontSize: 10, fontWeight: 700,
-                        color: '#fff', opacity: 0.9,
-                      }}>{w.score}</div>
-                    )}
-                    {/* "This week" indicator */}
-                    {isLast && (
-                      <div style={{
-                        position: 'absolute', top: -18, left: 0, right: 0,
-                        textAlign: 'center', fontSize: 9, fontWeight: 700, color,
-                      }}>NOW</div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* X-axis date labels */}
-          <div style={{ position: 'absolute', left: 28, top: HEIGHT + 6, display: 'flex', gap: BAR_GAP }}>
-            {weeks.map((w, i) => {
-              const showLabel = weeks.length <= 8 || i % 2 === 0 || i === weeks.length - 1
-              return (
-                <div key={w.week} style={{ width: BAR_W, flexShrink: 0, textAlign: 'center' }}>
-                  {showLabel && (
-                    <div style={{ fontSize: 9, color: hoveredIdx === i ? scoreColor(w.score) : 'var(--text3)', fontWeight: hoveredIdx === i ? 700 : 400, lineHeight: 1.2 }}>
-                      {fmtWeek(w.week).replace(' ', '\n')}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
+          {/* Hover tooltip */}
+          {hovered && hovX !== null && hovY !== null && (() => {
+            const tipW = 80, tipH = 40
+            const tipX = Math.min(W - PAD_R - tipW, Math.max(PAD_L, hovX - tipW / 2))
+            const tipY = hovY > PAD_T + 50 ? hovY - tipH - 8 : hovY + 12
+            const scoreC = hovered.score >= idealScore ? '#22c55e' : hovered.score >= idealScore - 15 ? '#f59e0b' : '#9f91ff'
+            return (
+              <g>
+                <rect x={tipX} y={tipY} width={tipW} height={tipH} rx={6} fill="var(--bg)" stroke={scoreC} strokeWidth={1} />
+                <text x={tipX + tipW / 2} y={tipY + 13} fontSize={9} fill="var(--text3)" textAnchor="middle">{hovered.label}</text>
+                <text x={tipX + tipW / 2} y={tipY + 28} fontSize={14} fontWeight="800" fill={scoreC} textAnchor="middle" fontFamily="var(--font-display)">{hovered.score}</text>
+              </g>
+            )
+          })()}
+        </svg>
       </div>
 
       {/* Legend */}
-      <div style={{ display: 'flex', gap: 14, marginTop: 12, fontSize: 11, color: 'var(--text3)', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: 11, color: 'var(--text3)', flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 12, height: 3, background: '#fbbf24', display: 'inline-block', borderRadius: 1 }} />
+          <span style={{ width: 16, height: 2, background: 'linear-gradient(90deg, #7c6aff, #c084fc)', display: 'inline-block', borderRadius: 1 }} />
+          Your Life Score
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 14, height: 1, background: '#fbbf24', display: 'inline-block', borderRadius: 1, borderTop: '1px dashed #fbbf24' }} />
           Ideal Joseph ({idealScore})
-        </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 2, background: '#22c55e', display: 'inline-block' }} />
-          At or above ideal
-        </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 2, background: '#f59e0b', display: 'inline-block' }} />
-          Within 15 pts
-        </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 2, background: '#9f91ff', display: 'inline-block' }} />
-          Building
         </span>
       </div>
 
       {/* Motivational note */}
-      {weeks.length >= 2 && (
-        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: 'var(--bg3)', fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+      {data.length >= 2 && (
+        <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 8, background: 'var(--bg3)', fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
           {trend > 5
-            ? `🔥 You're trending up +${trend} pts from last week. Keep this energy.`
+            ? `🔥 Trending up +${trend} pts. That curve is going in the right direction.`
             : trend >= 0
-            ? `📈 Holding steady. Consistency is the game — keep showing up.`
-            : `⚡ Down ${Math.abs(trend)} pts from last week. One focused week flips this. You know what to do.`}
+            ? `📈 Holding steady. Consistency is the game — the curve tells the truth.`
+            : `⚡ Down ${Math.abs(trend)} pts. One focused week flips this. You know what to do.`}
         </div>
       )}
     </div>
@@ -411,8 +463,8 @@ export default function IdealJosephView({ pillarScores, lifeScore, weeklyHistory
         </div>
       </div>
 
-      {/* ── Weekly history chart ── */}
-      <WeeklyHistoryChart weeklyHistory={weeklyHistory} idealScore={idealScore} />
+      {/* ── Progress curve chart ── */}
+      <ProgressCurveChart weeklyHistory={weeklyHistory} pillarScores={pillarScores} idealScore={idealScore} />
 
       {/* The frameworks — collapsible */}
       <div className="card" style={{ marginTop: 16 }}>

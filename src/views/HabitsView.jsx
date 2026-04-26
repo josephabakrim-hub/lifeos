@@ -37,6 +37,37 @@ const LIFE_AREA_PRESETS = [
     ],
   },
   {
+    area: 'Finance', icon: '💰', color: '#22c55e',
+    habits: [
+      { name: 'Track expenses',       icon: '💸', description: 'Log every expense — awareness is step one to control', color: '#22c55e', scheduledDays: ALL_DAYS },
+      { name: 'No impulse purchases', icon: '🚫', description: '24h rule — wait a day before any unplanned buy',       color: '#22c55e', scheduledDays: ALL_DAYS },
+      { name: 'Weekly budget review', icon: '📊', description: 'Review spending vs budget — catch leaks early',        color: '#22c55e', scheduledDays: [1], frequency: 'weekly', anchorDay: 1 },
+      { name: 'Net worth check',      icon: '📈', description: 'Log assets & liabilities — track your wealth trend',   color: '#22c55e', frequency: 'monthly', anchorDate: 1 },
+      { name: 'Save first',           icon: '🏦', description: 'Transfer savings before spending — pay yourself first', color: '#22c55e', scheduledDays: ALL_DAYS },
+      { name: 'Financial learning',   icon: '📚', description: '10 min reading on investing, money, or economics',     color: '#22c55e', scheduledDays: ALL_DAYS },
+    ],
+  },
+  {
+    area: 'Morning Routine', icon: '🌅', color: '#f59e0b',
+    habits: [
+      { name: 'No phone first 30 min', icon: '📵', description: 'Protect your morning brain — no scrolling on waking',    color: '#f59e0b', scheduledDays: ALL_DAYS },
+      { name: 'Morning sunlight',       icon: '☀️', description: '5–10 min outside light within 1 hour of waking (Huberman)', color: '#f59e0b', scheduledDays: ALL_DAYS },
+      { name: 'Cold shower',            icon: '🚿', description: '30–90 sec cold water — dopamine + alertness boost',      color: '#f59e0b', scheduledDays: ALL_DAYS },
+      { name: 'Set daily intention',    icon: '🎯', description: 'Write your #1 goal for the day before anything else',    color: '#f59e0b', scheduledDays: ALL_DAYS },
+      { name: 'Hydrate on wake',        icon: '💧', description: '500ml water within 30 min of waking — rehydrate',       color: '#f59e0b', scheduledDays: ALL_DAYS },
+    ],
+  },
+  {
+    area: 'Nutrition', icon: '🥗', color: '#84cc16',
+    habits: [
+      { name: 'Eat whole foods',      icon: '🥦', description: 'Prioritise unprocessed, single-ingredient foods',        color: '#84cc16', scheduledDays: ALL_DAYS },
+      { name: 'Hit protein target',   icon: '🥩', description: '1g per lb bodyweight — muscle, satiety, metabolism',     color: '#84cc16', scheduledDays: ALL_DAYS },
+      { name: 'No junk food',         icon: '🚫', description: 'Avoid ultra-processed food — default to real ingredients', color: '#84cc16', scheduledDays: ALL_DAYS },
+      { name: 'Mindful eating',       icon: '🍽️', description: 'Eat slowly, no screens — taste and satiety signals',     color: '#84cc16', scheduledDays: ALL_DAYS },
+      { name: 'Meal prep',            icon: '🧑‍🍳', description: 'Prepare meals in advance — controls choices under pressure', color: '#84cc16', scheduledDays: [0], frequency: 'weekly', anchorDay: 0 },
+    ],
+  },
+  {
     area: 'Focus', icon: '🎯', color: '#7c6aff',
     habits: [
       { name: 'Deep work session',  icon: '🎯', description: 'Minimum 90 min uninterrupted focus block',      color: '#7c6aff', scheduledDays: ALL_DAYS },
@@ -70,11 +101,36 @@ const LIFE_AREA_PRESETS = [
       { name: 'Spend time with others',  icon: '👥', description: 'Quality in-person or intentional social time', color: '#ec4899', scheduledDays: ALL_DAYS },
     ],
   },
+  {
+    area: 'Creativity', icon: '🎨', color: '#e879f9',
+    habits: [
+      { name: 'Create something',     icon: '🎨', description: 'Write, draw, build, design — make not consume',      color: '#e879f9', scheduledDays: ALL_DAYS },
+      { name: 'Capture ideas',        icon: '💡', description: 'Write down every idea — good ones come from quantity', color: '#e879f9', scheduledDays: ALL_DAYS },
+      { name: 'Weekly creative dump', icon: '🖊️', description: 'Free-write or sketch for 15 min — no editing',       color: '#e879f9', scheduledDays: [0], frequency: 'weekly', anchorDay: 0 },
+      { name: 'Learn a new skill',    icon: '🧩', description: 'Dedicate 20 min to a creative or technical skill',   color: '#e879f9', scheduledDays: ALL_DAYS },
+    ],
+  },
+  {
+    area: 'Environment', icon: '🏠', color: '#06b6d4',
+    habits: [
+      { name: 'Make your bed',       icon: '🛏️', description: 'Start with a win — sets tone for ordered environment', color: '#06b6d4', scheduledDays: ALL_DAYS },
+      { name: 'Clear your desk',     icon: '🖥️', description: 'End of day: clean workspace = clean mind tomorrow',    color: '#06b6d4', scheduledDays: ALL_DAYS },
+      { name: 'Weekly home reset',   icon: '🧹', description: 'Deep tidy once a week — your space shapes your state', color: '#06b6d4', scheduledDays: [0], frequency: 'weekly', anchorDay: 0 },
+      { name: 'Digital declutter',   icon: '📂', description: 'Clear inbox, files, tabs — reduce cognitive load',     color: '#06b6d4', scheduledDays: WEEKDAYS },
+    ],
+  },
 ]
 
 // ─── Schedule helpers ─────────────────────────────────────────────────────────
 
-function scheduleLabel(days) {
+const MONTH_ORDINALS = ['1st','2nd','3rd','4th','5th','6th','7th','8th','9th','10th',
+  '11th','12th','13th','14th','15th','16th','17th','18th','19th','20th',
+  '21st','22nd','23rd','24th','25th','26th','27th','28th','29th','30th','31st']
+
+function scheduleLabel(days, habit) {
+  if (habit?.frequency === 'biweekly') return '📆 Every 2 weeks'
+  if (habit?.frequency === 'monthly')  return `📆 Monthly (${MONTH_ORDINALS[(habit.anchorDate || 1) - 1]} of month)`
+  if (habit?.frequency === 'weekly')   return `📆 Weekly (${DAY_LABELS[habit.anchorDay ?? 1]}s)`
   if (!days || days.length === 7) return 'Every day'
   if (days.length === 0) return 'No days'
   const s = [...days].sort()
@@ -87,8 +143,9 @@ function scheduleLabel(days) {
 
 // ─── Day selector ─────────────────────────────────────────────────────────────
 
-function DaySelector({ value, onChange }) {
+function DaySelector({ value, onChange, frequency, anchorDay, anchorDate, onFrequencyChange }) {
   function toggle(day) {
+    if (frequency) { onFrequencyChange(null, null, null); return }
     if (value.includes(day)) {
       if (value.length === 1) return
       onChange(value.filter(d => d !== day))
@@ -96,34 +153,93 @@ function DaySelector({ value, onChange }) {
       onChange([...value, day].sort())
     }
   }
+
+  const isFreq = (f) => frequency === f
+
   return (
     <div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+      {/* Row 1: standard presets */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
         {[
           { label: 'Every day',          days: ALL_DAYS },
           { label: 'Weekdays',           days: WEEKDAYS },
           { label: 'Weekends',           days: WEEKENDS },
-          { label: 'Every other day ①', days: ALT_A,  title: 'Mon, Wed, Fri' },
-          { label: 'Every other day ②', days: ALT_B,  title: 'Tue, Thu, Sat/Sun' },
+          { label: 'Alt ① Mon/Wed/Fri', days: ALT_A },
+          { label: 'Alt ② Tue/Thu/Sun', days: ALT_B },
         ].map(p => {
-          const active = JSON.stringify([...value].sort()) === JSON.stringify([...p.days].sort())
+          const active = !frequency && JSON.stringify([...value].sort()) === JSON.stringify([...p.days].sort())
           return (
-            <button key={p.label} type="button" title={p.title} onClick={() => onChange([...p.days])} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`, background: active ? 'var(--accent-glow)' : 'transparent', color: active ? 'var(--accent)' : 'var(--text3)' }}>
+            <button key={p.label} type="button" onClick={() => { onFrequencyChange(null, null, null); onChange([...p.days]) }}
+              style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`, background: active ? 'var(--accent-glow)' : 'transparent', color: active ? 'var(--accent)' : 'var(--text3)' }}>
               {p.label}
             </button>
           )
         })}
       </div>
-      <div style={{ display: 'flex', gap: 4 }}>
-        {DAY_LABELS.map((label, idx) => {
-          const active = value.includes(idx)
-          return (
-            <button key={idx} type="button" onClick={() => toggle(idx)} style={{ flex: 1, padding: '6px 0', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`, background: active ? 'var(--accent-glow)' : 'var(--bg3)', color: active ? 'var(--accent)' : 'var(--text3)' }}>
-              {label}
-            </button>
-          )
-        })}
+
+      {/* Row 2: periodic presets */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+        {[
+          { label: '📆 Weekly', f: 'weekly' },
+          { label: '📆 Every 2 weeks', f: 'biweekly' },
+          { label: '📆 Monthly', f: 'monthly' },
+        ].map(p => (
+          <button key={p.f} type="button"
+            onClick={() => onFrequencyChange(p.f, p.f === 'monthly' ? null : (anchorDay ?? 1), p.f === 'monthly' ? (anchorDate ?? 1) : null)}
+            style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${isFreq(p.f) ? '#22c55e' : 'var(--border)'}`, background: isFreq(p.f) ? 'rgba(34,197,94,0.1)' : 'transparent', color: isFreq(p.f) ? '#22c55e' : 'var(--text3)' }}>
+            {p.label}
+          </button>
+        ))}
       </div>
+
+      {/* Weekly: pick anchor day */}
+      {(isFreq('weekly') || isFreq('biweekly')) && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 5 }}>
+            {isFreq('biweekly') ? 'Which day of the week?' : 'Which day every week?'}
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {DAY_LABELS.map((label, idx) => (
+              <button key={idx} type="button"
+                onClick={() => onFrequencyChange(frequency, idx, null)}
+                style={{ flex: 1, padding: '6px 0', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${anchorDay === idx ? '#22c55e' : 'var(--border)'}`, background: anchorDay === idx ? 'rgba(34,197,94,0.1)' : 'var(--bg3)', color: anchorDay === idx ? '#22c55e' : 'var(--text3)' }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Monthly: pick anchor date */}
+      {isFreq('monthly') && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 5 }}>Which day of the month? (1–28)</div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28].map(d => (
+              <button key={d} type="button"
+                onClick={() => onFrequencyChange('monthly', null, d)}
+                style={{ width: 30, height: 30, borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${anchorDate === d ? '#22c55e' : 'var(--border)'}`, background: anchorDate === d ? 'rgba(34,197,94,0.1)' : 'var(--bg3)', color: anchorDate === d ? '#22c55e' : 'var(--text3)' }}>
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Individual day toggles (only when not using periodic frequency) */}
+      {!frequency && (
+        <div style={{ display: 'flex', gap: 4 }}>
+          {DAY_LABELS.map((label, idx) => {
+            const active = value.includes(idx)
+            return (
+              <button key={idx} type="button" onClick={() => toggle(idx)}
+                style={{ flex: 1, padding: '6px 0', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`, background: active ? 'var(--accent-glow)' : 'var(--bg3)', color: active ? 'var(--accent)' : 'var(--text3)' }}>
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -235,6 +351,35 @@ function HabitModal({ onClose, onSave, editHabit }) {
   const [color,         setColor]         = useState(editHabit?.color       || '#7c6aff')
   const [description,   setDescription]   = useState(editHabit?.description || '')
   const [scheduledDays, setScheduledDays] = useState(editHabit?.scheduledDays ?? ALL_DAYS)
+  const [frequency,     setFrequency]     = useState(editHabit?.frequency   || null)
+  const [anchorDay,     setAnchorDay]     = useState(editHabit?.anchorDay   ?? 1)
+  const [anchorDate,    setAnchorDate]    = useState(editHabit?.anchorDate  ?? 1)
+
+  function handleFrequencyChange(f, ad, adate) {
+    setFrequency(f)
+    if (ad !== null && ad !== undefined) setAnchorDay(ad)
+    if (adate !== null && adate !== undefined) setAnchorDate(adate)
+  }
+
+  function handleSave() {
+    if (!name.trim()) return
+    const data = { name: name.trim(), icon, color, description, scheduledDays }
+    if (frequency) {
+      data.frequency  = frequency
+      data.anchorDay  = frequency !== 'monthly' ? anchorDay : null
+      data.anchorDate = frequency === 'monthly'  ? anchorDate : null
+    } else {
+      data.frequency  = null
+      data.anchorDay  = null
+      data.anchorDate = null
+    }
+    onSave(data)
+    onClose()
+  }
+
+  const previewLabel = frequency
+    ? scheduleLabel(scheduledDays, { frequency, anchorDay, anchorDate })
+    : scheduleLabel(scheduledDays)
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -249,10 +394,20 @@ function HabitModal({ onClose, onSave, editHabit }) {
           <input value={description} onChange={e => setDescription(e.target.value)} placeholder="e.g. No revenge trades, max 3 setups" />
         </div>
         <div className="form-group">
-          <label>Scheduled days</label>
-          <DaySelector value={scheduledDays} onChange={setScheduledDays} />
-          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
-            Habit only counts on scheduled days — off days won't affect your score.
+          <label>Schedule</label>
+          <DaySelector
+            value={scheduledDays}
+            onChange={setScheduledDays}
+            frequency={frequency}
+            anchorDay={anchorDay}
+            anchorDate={anchorDate}
+            onFrequencyChange={handleFrequencyChange}
+          />
+          <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 8, fontWeight: 600 }}>
+            📅 {previewLabel}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>
+            Habit only appears & counts on scheduled days — off days won't affect your score.
           </div>
         </div>
         <div className="form-group">
@@ -273,7 +428,7 @@ function HabitModal({ onClose, onSave, editHabit }) {
         </div>
         <div className="modal-footer">
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={() => { if (!name.trim()) return; onSave({ name: name.trim(), icon, color, description, scheduledDays }); onClose() }}>Save habit</button>
+          <button className="btn btn-primary" onClick={handleSave}>Save habit</button>
         </div>
       </div>
     </div>
@@ -475,7 +630,7 @@ function HabitCard({ habit, logs, today, toggleHabitLog, onEdit, onArchive, onDe
             className={`habit-toggle ${isDone ? 'done' : ''}`}
             style={{ borderColor: isDone ? habit.color : 'var(--border2)', background: isDone ? habit.color : 'transparent', cursor: isScheduledToday ? 'pointer' : 'not-allowed', flexShrink: 0, marginTop: 2 }}
             onClick={() => isScheduledToday && toggleHabitLog(habit.id)}
-            title={isScheduledToday ? undefined : `Not scheduled today — ${scheduleLabel(scheduledDays)}`}
+            title={isScheduledToday ? undefined : `Not scheduled today — ${scheduleLabel(scheduledDays, habit)}`}
           >
             {isDone ? '✓' : ''}
           </button>
@@ -484,7 +639,7 @@ function HabitCard({ habit, logs, today, toggleHabitLog, onEdit, onArchive, onDe
             <div style={{ fontWeight: 600, fontSize: 15, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? 'var(--text3)' : 'var(--text)', wordBreak: 'break-word' }}>{habit.name}</div>
             {habit.description && <div style={{ fontSize: 12, color: 'var(--text3)', wordBreak: 'break-word', lineHeight: 1.4 }}>{habit.description}</div>}
             <div style={{ fontSize: 11, marginTop: 2 }}>
-              <span style={{ color: 'var(--text3)' }}>📅 {scheduleLabel(scheduledDays)}</span>
+              <span style={{ color: 'var(--text3)' }}>📅 {scheduleLabel(scheduledDays, habit)}</span>
               {!isScheduledToday && <span style={{ color: 'var(--amber)', fontWeight: 600, marginLeft: 6 }}>· Off today</span>}
             </div>
           </div>
@@ -545,7 +700,7 @@ function StatRow({ s, onEdit, onArchive, onUnarchive, onDelete }) {
               <span>⚡ Now: {currentStreak}d</span>
               <span>📅 Total: {totalDays}</span>
               <span>📊 Rate: {allTimeRate}%</span>
-              <span style={{ color: 'var(--accent)' }}>🗓 {scheduleLabel(habit.scheduledDays ?? ALL_DAYS)}</span>
+              <span style={{ color: 'var(--accent)' }}>🗓 {scheduleLabel(habit.scheduledDays ?? ALL_DAYS, habit)}</span>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -720,7 +875,7 @@ function PresetPanel({ habits, addHabit, onClose }) {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 14, fontWeight: 600 }}>{h.name}</div>
                       <div style={{ fontSize: 12, color: 'var(--text3)' }}>{h.description}</div>
-                      <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>📅 {scheduleLabel(h.scheduledDays)}</div>
+                      <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>📅 {scheduleLabel(h.scheduledDays, h)}</div>
                     </div>
                     <button className="btn btn-sm" style={added ? { color: 'var(--green)', borderColor: 'var(--green)' } : {}} disabled={added} onClick={() => !added && addHabit(h)}>
                       {added ? '✓ Added' : '+ Add'}
