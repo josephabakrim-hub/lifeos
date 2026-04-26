@@ -50,9 +50,88 @@ function GapMeter({ actual, ideal, color }) {
 
 // ─── Progress curve chart (TradingView-style) ────────────────────────────────
 
+function BarCompareChart({ weeklyHistory = [], pillarScores, idealScore }) {
+  // Get last week's scores from history (second-to-last entry)
+  const lastWeek = weeklyHistory.length >= 2
+    ? weeklyHistory[weeklyHistory.length - 2]
+    : null
+
+  const bars = PILLARS.map(p => ({
+    ...p,
+    lastWeek: lastWeek?.pillars?.[p.key] ?? null,
+    current:  pillarScores[p.key] ?? 0,
+    ideal:    IDEAL_WEEKLY_BENCHMARKS[p.key]?.score ?? 100,
+  }))
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14 }}>
+        Each pillar: last week · this week · Ideal Joseph target
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: 14, marginBottom: 16, fontSize: 11, color: 'var(--text3)', flexWrap: 'wrap' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--bg4)', display: 'inline-block', border: '1px solid var(--border2)' }} />
+          Last week
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 12, height: 12, borderRadius: 3, background: 'linear-gradient(135deg,#9f91ff,#c084fc)', display: 'inline-block' }} />
+          This week (you)
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 12, height: 12, borderRadius: 3, background: '#fbbf24', display: 'inline-block' }} />
+          Ideal Joseph
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {bars.map(b => (
+          <div key={b.key}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+              <span style={{ fontSize: 14 }}>{b.icon}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, minWidth: 60 }}>{b.label}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {/* Last week */}
+              {b.lastWeek !== null && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 60, fontSize: 10, color: 'var(--text3)', textAlign: 'right', flexShrink: 0 }}>Last wk</div>
+                  <div style={{ flex: 1, height: 8, background: 'var(--bg4)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${b.lastWeek}%`, background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 4, transition: 'width 0.6s ease' }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', width: 24, textAlign: 'right', flexShrink: 0 }}>{b.lastWeek}</div>
+                </div>
+              )}
+              {/* This week */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 60, fontSize: 10, color: 'var(--text3)', textAlign: 'right', flexShrink: 0 }}>This wk</div>
+                <div style={{ flex: 1, height: 8, background: 'var(--bg4)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${b.current}%`, background: `linear-gradient(90deg, #7c6aff, #c084fc)`, borderRadius: 4, transition: 'width 0.6s ease' }} />
+                </div>
+                <div style={{ fontSize: 11, color: '#9f91ff', fontWeight: 700, width: 24, textAlign: 'right', flexShrink: 0 }}>{b.current}</div>
+              </div>
+              {/* Ideal */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 60, fontSize: 10, color: '#fbbf24', textAlign: 'right', flexShrink: 0 }}>Ideal</div>
+                <div style={{ flex: 1, height: 8, background: 'var(--bg4)', borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
+                  <div style={{ height: '100%', width: `${b.ideal}%`, background: 'rgba(251,191,36,0.3)', borderRadius: 4, transition: 'width 0.6s ease' }} />
+                  <div style={{ position: 'absolute', top: 0, left: `${b.ideal}%`, transform: 'translateX(-1px)', width: 2, height: '100%', background: '#fbbf24', borderRadius: 1 }} />
+                </div>
+                <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 700, width: 24, textAlign: 'right', flexShrink: 0 }}>{b.ideal}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function ProgressCurveChart({ weeklyHistory = [], pillarScores, idealScore }) {
   const [timeframe, setTimeframe] = useState('weekly')
   const [hoveredIdx, setHoveredIdx] = useState(null)
+  const [chartView, setChartView] = useState('curve') // 'curve' | 'bars'
 
   // ── Build daily data from weeklyHistory pillar breakdowns ────────────────
   // We approximate daily by interpolating between weekly data points
@@ -106,15 +185,13 @@ function ProgressCurveChart({ weeklyHistory = [], pillarScores, idealScore }) {
 
   const data = timeframe === 'daily' ? dailyData : timeframe === 'weekly' ? weeklyData : monthlyData
 
-  if (!data.length) return null
-
-  // Chart layout
+  // Chart layout — only used in curve mode
   const W = 560, H = 160, PAD_L = 32, PAD_R = 24, PAD_T = 16, PAD_B = 28
   const chartW = W - PAD_L - PAD_R
   const chartH = H - PAD_T - PAD_B
 
-  const minScore = Math.max(0, Math.min(...data.map(d => d.score)) - 10)
-  const maxScore = Math.min(100, Math.max(...data.map(d => d.score)) + 10)
+  const minScore = data.length ? Math.max(0, Math.min(...data.map(d => d.score)) - 10) : 0
+  const maxScore = data.length ? Math.min(100, Math.max(...data.map(d => d.score)) + 10) : 100
   const range = maxScore - minScore || 10
 
   function xPos(i) { return PAD_L + (i / Math.max(data.length - 1, 1)) * chartW }
@@ -149,8 +226,8 @@ function ProgressCurveChart({ weeklyHistory = [], pillarScores, idealScore }) {
 
   // Summary stats
   const latest  = data[data.length - 1]?.score ?? 0
-  const avg     = Math.round(data.reduce((s, d) => s + d.score, 0) / data.length)
-  const best    = Math.max(...data.map(d => d.score))
+  const avg     = data.length ? Math.round(data.reduce((s, d) => s + d.score, 0) / data.length) : 0
+  const best    = data.length ? Math.max(...data.map(d => d.score)) : 0
   const trend   = data.length >= 2 ? data[data.length - 1].score - data[data.length - 2].score : 0
 
   // X-axis labels: show up to 6 evenly spaced
@@ -175,17 +252,44 @@ function ProgressCurveChart({ weeklyHistory = [], pillarScores, idealScore }) {
           <div className="card-title" style={{ margin: 0, marginBottom: 2 }}>📈 Your progress curve</div>
           <div style={{ fontSize: 12, color: 'var(--text3)' }}>Life Score over time vs Ideal Joseph</div>
         </div>
-        {/* Timeframe toggle */}
-        <div style={{ display: 'flex', gap: 4, background: 'var(--bg3)', padding: 3, borderRadius: 8, border: '1px solid var(--border)' }}>
-          {[{ id: 'daily', label: '1D' }, { id: 'weekly', label: '1W' }, { id: 'monthly', label: '1M' }].map(tf => (
-            <button key={tf.id} onClick={() => { setTimeframe(tf.id); setHoveredIdx(null) }}
-              style={{ padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', background: timeframe === tf.id ? 'var(--accent)' : 'transparent', color: timeframe === tf.id ? '#fff' : 'var(--text3)', transition: 'all 0.15s' }}>
-              {tf.label}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* View toggle */}
+          <div style={{ display: 'flex', gap: 2, background: 'var(--bg3)', padding: 3, borderRadius: 8, border: '1px solid var(--border)' }}>
+            <button onClick={() => setChartView('curve')}
+              style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', background: chartView === 'curve' ? 'var(--accent)' : 'transparent', color: chartView === 'curve' ? '#fff' : 'var(--text3)', transition: 'all 0.15s' }}>
+              📈 Curve
             </button>
-          ))}
+            <button onClick={() => setChartView('bars')}
+              style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', background: chartView === 'bars' ? 'var(--accent)' : 'transparent', color: chartView === 'bars' ? '#fff' : 'var(--text3)', transition: 'all 0.15s' }}>
+              📊 Bars
+            </button>
+          </div>
+          {/* Timeframe toggle — only for curve */}
+          {chartView === 'curve' && (
+            <div style={{ display: 'flex', gap: 4, background: 'var(--bg3)', padding: 3, borderRadius: 8, border: '1px solid var(--border)' }}>
+              {[{ id: 'daily', label: '1D' }, { id: 'weekly', label: '1W' }, { id: 'monthly', label: '1M' }].map(tf => (
+                <button key={tf.id} onClick={() => { setTimeframe(tf.id); setHoveredIdx(null) }}
+                  style={{ padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', background: timeframe === tf.id ? 'rgba(124,106,255,0.6)' : 'transparent', color: timeframe === tf.id ? '#fff' : 'var(--text3)', transition: 'all 0.15s' }}>
+                  {tf.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Bar chart view */}
+      {chartView === 'bars' && (
+        <BarCompareChart weeklyHistory={weeklyHistory} pillarScores={pillarScores} idealScore={idealScore} />
+      )}
+
+      {/* Curve view */}
+      {chartView === 'curve' && <>
+      {!data.length ? (
+        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>
+          No history yet — keep logging and your curve will appear here.
+        </div>
+      ) : <>
       {/* Summary pills */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
         {[
@@ -317,6 +421,8 @@ function ProgressCurveChart({ weeklyHistory = [], pillarScores, idealScore }) {
             : `⚡ Down ${Math.abs(trend)} pts. One focused week flips this. You know what to do.`}
         </div>
       )}
+      </>}
+      </>}
     </div>
   )
 }
