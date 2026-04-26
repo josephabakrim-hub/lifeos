@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
 import { calcLifeScore } from '../lib/idealJoseph'
 import { getWeekStart } from '../lib/utils'
+import { isHabitScheduledOn } from './useHabits'
 
 /**
  * Derives weekly Life Score history from all pillar hooks.
- * Looks back up to 12 weeks and computes the score for each week
- * using the same scoring functions already in each hook.
+ * Each pillar's scoring logic mirrors its live getWeekScore() exactly.
  */
 export function useWeeklyHistory({ habitsData, weeklyData, fitnessData, mentalData, socialData, learnData, goalsData }) {
 
@@ -13,115 +13,187 @@ export function useWeeklyHistory({ habitsData, weeklyData, fitnessData, mentalDa
     const weeks = []
 
     for (let i = 0; i < 12; i++) {
-      // Build a date that falls in week i weeks ago
       const ref = new Date()
       ref.setDate(ref.getDate() - i * 7)
       const weekStart = getWeekStartFor(ref)
       const weekEnd   = getWeekEndFor(ref)
 
-      // ── Habits score for that week ─────────────────────────────────
-      const activeHabits = habitsData.habits.filter(h => h.active)
+      // ── Habits — mirrors useHabits.getWeekScore exactly ─────────────────────
+      // Uses isHabitScheduledOn per day, skips mastered habits, only counts
+      // habits actually scheduled on each day (not total habits every day)
+      const activeHabits = habitsData.habits.filter(h => h.active && !h.mastered)
       let habitsScore = 0
       if (activeHabits.length > 0) {
-        let total = 0
+        let totalScore = 0
+        let countedDays = 0
         for (let d = 0; d < 7; d++) {
           const dayRef = new Date(weekStart + 'T12:00:00')
           dayRef.setDate(dayRef.getDate() + d)
           const dateStr = dayRef.toISOString().split('T')[0]
-          const done = activeHabits.filter(h =>
+          if (dateStr > weekEnd) break
+
+          const scheduledThatDay = activeHabits.filter(h => isHabitScheduledOn(h, dateStr))
+          if (!scheduledThatDay.length) continue
+
+          const done = scheduledThatDay.filter(h =>
             habitsData.logs.find(l => l.habitId === h.id && l.date === dateStr && l.done)
           ).length
-          total += (done / activeHabits.length) * 100
+          totalScore += (done / scheduledThatDay.length) * 100
+          countedDays++
         }
-        habitsScore = Math.round(total / 7)
+        habitsScore = countedDays > 0 ? Math.round(totalScore / countedDays) : 0
       }
 
-      // ── Weekly plan score for that week ───────────────────────────
+      // ── Weekly plan — mirrors useWeekly.getWeekScore exactly ─────────────────
       const plan = weeklyData.plans.find(p => p.weekStart === weekStart)
       let weeklyScore = 0
       if (plan) {
         const goals = plan.goals || []
         if (goals.length > 0) {
           const done = goals.filter(g => g.done).length
-          const execScore = Math.round((done / goals.length) * 100)
-          const _sunDone = plan.sundayReviewDone ?? plan.sundayPlanDone ?? false
-          const _monDone = plan.mondayPlanDone   ?? plan.fridayReviewDone ?? false
-          const reviewBonus = (_sunDone ? 10 : 0) + (_monDone ? 10 : 0)
+          const execScore  = Math.round((done / goals.length) * 100)
+          const sundayDone = plan.sundayReviewDone ?? plan.sundayPlanDone ?? false
+          const mondayDone = plan.mondayPlanDone   ?? plan.fridayReviewDone ?? false
+          const reviewBonus = (sundayDone ? 10 : 0) + (mondayDone ? 10 : 0)
           weeklyScore = Math.min(100, Math.round(execScore * 0.8 + reviewBonus))
         }
       }
 
-      // ── Fitness score for that week ───────────────────────────────
+      // ── Fitness — mirrors useFitness.getWeekScore exactly ────────────────────
+      // Counts hiit/jogging/walk for zone2, calisthenics as 0.5 resistance,
+      // and averages ALL sleep entries that week (not just one metric record)
       const weekWorkouts = fitnessData.workouts.filter(w => w.date >= weekStart && w.date <= weekEnd)
+      const weekMetrics  = fitnessData.metrics.filter(m => m.date >= weekStart && m.date <= weekEnd)
       let fitnessScore = 0
-      if (weekWorkouts.length > 0 || fitnessData.metrics.some(m => m.date >= weekStart && m.date <= weekEnd)) {
-        const resistance = weekWorkouts.filter(w => w.type === 'resistance').length
-        const zone2Mins  = weekWorkouts.filter(w => w.type === 'zone2').reduce((acc, w) => acc + (w.duration || 0), 0)
-        const weekMetric = fitnessData.metrics.find(m => m.date >= weekStart && m.date <= weekEnd && m.sleep)
-        const sleepScore  = weekMetric?.sleep ? Math.min(100, (weekMetric.sleep / 7.5) * 100) : 0
-        const resScore    = Math.min(100, (resistance / 3) * 100)
-        const zone2Score  = Math.min(100, (zone2Mins / 135) * 100)
-        fitnessScore = Math.round(resScore * 0.35 + zone2Score * 0.35 + sleepScore * 0.3)
+      if (weekWorkouts.length > 0 || weekMetrics.length > 0) {
+        const resistanceFull   = weekWorkouts.filter(w => w.type === 'resistance').length
+        const calisthenicsHalf = weekWorkouts.filter(w => ['pullups','pushups','dips','situps'].includes(w.type)).length * 0.5
+        const resistance       = resistanceFull + calisthenicsHalf
+        const resScore         = Math.min(100, (resistance / 3) * 100)
+
+        const zone2Mins = weekWorkouts.reduce((acc, w) => {
+          if (['zone2', 'hiit', 'jogging'].includes(w.type)) return acc + (w.duration || 0)
+          if (w.type === 'walk')                              return acc + (w.duration || 0) * 0.5
+          return acc
+        }, 0)
+        const zone2Score = Math.min(100, (zone2Mins / 135) * 100)
+
+        const sleepEntries = weekMetrics.filter(m => m.sleep)
+        const avgSleep     = sleepEntries.length
+          ? sleepEntries.reduce((a, m) => a + m.sleep, 0) / sleepEntries.length
+          : null
+        const sleepScore   = avgSleep !== null ? Math.min(100, (avgSleep / 7.5) * 100) : 0
+
+        fitnessScore = avgSleep === null
+          ? Math.round(resScore * 0.5 + zone2Score * 0.5)
+          : Math.round(resScore * 0.35 + zone2Score * 0.35 + sleepScore * 0.3)
       }
 
-      // ── Mental score for that week ────────────────────────────────
+      // ── Mental — mirrors useMental.getWeekScore exactly ──────────────────────
+      // No fallback defaults (old code defaulted missing data to 3, inflating scores)
       const weekMentalLogs = mentalData.logs.filter(l => l.date >= weekStart && l.date <= weekEnd)
       let mentalScore = 0
       if (weekMentalLogs.length > 0) {
         const morningDone    = weekMentalLogs.filter(l => l.morning).length
         const eveningDone    = weekMentalLogs.filter(l => l.evening).length
         const meditationDays = weekMentalLogs.filter(l => l.evening?.practices?.meditation).length
-        const moodsArr       = weekMentalLogs.filter(l => l.morning?.mood)
-        const stressArr      = weekMentalLogs.filter(l => l.evening?.stress)
-        const clarityArr     = weekMentalLogs.filter(l => l.evening?.clarity)
-        const avgMood    = moodsArr.length   ? moodsArr.reduce((s, l) => s + l.morning.mood, 0) / moodsArr.length     : 3
-        const avgStress  = stressArr.length  ? stressArr.reduce((s, l) => s + l.evening.stress, 0) / stressArr.length : 3
-        const avgClarity = clarityArr.length ? clarityArr.reduce((s, l) => s + l.evening.clarity, 0) / clarityArr.length : 3
+
+        const moodLogs    = weekMentalLogs.filter(l => l.morning?.mood)
+        const stressLogs  = weekMentalLogs.filter(l => l.evening?.stress)
+        const clarityLogs = weekMentalLogs.filter(l => l.evening?.clarity)
+
+        const avgMood    = moodLogs.length    ? moodLogs.reduce((s, l) => s + l.morning.mood, 0) / moodLogs.length       : 0
+        const avgStress  = stressLogs.length  ? stressLogs.reduce((s, l) => s + l.evening.stress, 0) / stressLogs.length : 0
+        const avgClarity = clarityLogs.length ? clarityLogs.reduce((s, l) => s + l.evening.clarity, 0) / clarityLogs.length : 0
+
         mentalScore = Math.round(
           ((morningDone / 7) * 100) * 0.20 +
           ((eveningDone / 7) * 100) * 0.20 +
           ((meditationDays / 7) * 100) * 0.15 +
-          ((avgMood / 5) * 100) * 0.20 +
-          ((1 - ((avgStress - 1) / 4)) * 100) * 0.10 +
-          ((avgClarity / 5) * 100) * 0.15
+          (avgMood    ? (avgMood / 5) * 100                    : 0) * 0.20 +
+          (avgStress  ? (1 - ((avgStress - 1) / 4)) * 100      : 0) * 0.10 +
+          (avgClarity ? (avgClarity / 5) * 100                 : 0) * 0.15
         )
       }
 
-      // ── Social score for that week ────────────────────────────────
-      const socialLog = socialData.logs.find(l => l.weekStart === weekStart)
-      let socialScore = 0
-      if (socialLog) {
-        const qualityScore  = socialLog.quality ? Math.round((socialLog.quality / 5) * 30) : 0
-        const contacted     = (socialLog.contactedIds || []).length
-        const target        = Math.max(1, Math.min(socialData.people.length, 4))
-        const contactScore  = Math.min(30, Math.round((contacted / target) * 30))
-        const newBonus      = socialLog.metNew ? 10 : 0
-        const cats = new Set((socialLog.contactedIds || []).map(id => socialData.people.find(p => p.id === id)?.category).filter(Boolean))
-        const catsBonus     = cats.size >= 4 ? 10 : cats.size >= 2 ? 5 : 0
-        socialScore = Math.min(100, 20 + qualityScore + contactScore + newBonus + catsBonus)
-      }
+      // ── Social — mirrors useSocial.getWeekScore exactly ──────────────────────
+      // Merges lastContacted on people records with contactedIds in the log
+      const socialLog    = socialData.logs.find(l => l.weekStart === weekStart)
+      const activePeople = socialData.people.filter(p => !p.archived)
 
-      // ── Learning score for that week ──────────────────────────────
+      const contactedThisWeek = activePeople.filter(
+        p => p.lastContacted && p.lastContacted >= weekStart && p.lastContacted <= weekEnd
+      )
+      const logContactedIds = socialLog?.contactedIds || []
+      const allContactedIds = new Set([
+        ...contactedThisWeek.map(p => p.id),
+        ...logContactedIds,
+      ])
+      const totalContacted = allContactedIds.size
+      const target         = Math.max(1, Math.min(activePeople.length, 4))
+      const contactScore   = Math.min(30, Math.round((totalContacted / target) * 30))
+
+      const cats = new Set(
+        [...allContactedIds].map(id => activePeople.find(p => p.id === id)?.category).filter(Boolean)
+      )
+      const catsBonus = cats.size >= 4 ? 10 : cats.size >= 2 ? 5 : 0
+
+      const socialScore = !socialLog
+        ? Math.min(100, contactScore + catsBonus)
+        : Math.min(100,
+            contactScore + catsBonus + 20 +
+            (socialLog.quality ? Math.round((socialLog.quality / 5) * 30) : 0) +
+            (socialLog.metNew ? 10 : 0)
+          )
+
+      // ── Learning — mirrors useLearn.getWeekScore exactly ─────────────────────
+      // Adds the missing reviewScore component (30% weight) and correct weights
       const weekLearnings = learnData.learnings.filter(l => l.date >= weekStart && l.date <= weekEnd)
+      const weekReviews   = learnData.learnings.flatMap(l =>
+        (l.reviewHistory || []).filter(r => r.date >= weekStart && r.date <= weekEnd)
+      )
       let learningScore = 0
-      if (weekLearnings.length > 0) {
+      if (weekLearnings.length > 0 || weekReviews.length > 0) {
         const hoursLogged = weekLearnings.reduce((acc, l) => acc + (l.duration || 0), 0)
         const notesCount  = weekLearnings.filter(l => l.takeaways?.length > 0).length
         const applied     = weekLearnings.filter(l => l.applied).length
+
+        const reviewsDone = weekReviews.length
+        const avgRecall   = reviewsDone > 0
+          ? weekReviews.reduce((s, r) => s + r.recallRating, 0) / reviewsDone
+          : 0
+
+        const hoursScore   = Math.min(100, (hoursLogged / 7) * 100)
+        const notesScore   = Math.min(100, (notesCount / 7) * 100)
+        const appliedScore = applied > 0 ? 100 : 0
+        const reviewScore  = reviewsDone === 0
+          ? 0
+          : Math.min(100, (reviewsDone / 3) * 100) * (avgRecall >= 3 ? 1 : 0.5)
+
         learningScore = Math.round(
-          Math.min(100, (hoursLogged / 7) * 100) * 0.5 +
-          Math.min(100, (notesCount / 7) * 100) * 0.3 +
-          (applied > 0 ? 100 : 0) * 0.2
+          hoursScore   * 0.35 +
+          notesScore   * 0.20 +
+          appliedScore * 0.15 +
+          reviewScore  * 0.30
         )
       }
 
-      // ── Goals score (uses current progress — best approximation) ──
+      // ── Goals — uses current goal progress as best approximation for past weeks
       const goalsScore = i === 0 ? goalsData.getWeekScore() : (() => {
         const activeGoals = goalsData.goals.filter(g => g.status === 'active')
         if (!activeGoals.length) return 0
         const avgProgress = activeGoals.reduce((acc, g) => acc + (g.progress || 0), 0) / activeGoals.length
-        const onTrack = activeGoals.filter(g => (g.progress || 0) >= 50).length
-        return Math.round(avgProgress * 0.5 + ((onTrack / activeGoals.length) * 100) * 0.5)
+        const allTasks    = activeGoals.flatMap(g => (g.milestones || []).flatMap(m => m.tasks || []))
+        const taskCompletion = allTasks.length > 0
+          ? (allTasks.filter(t => t.done).length / allTasks.length) * 100
+          : 0
+        const onTrack     = activeGoals.filter(g => (g.progress || 0) >= 50).length
+        const onTrackRate = (onTrack / activeGoals.length) * 100
+        return Math.min(100, Math.round(
+          allTasks.length > 0
+            ? avgProgress * 0.38 + onTrackRate * 0.28 + taskCompletion * 0.24
+            : avgProgress * 0.5  + onTrackRate * 0.5
+        ))
       })()
 
       const scores = {
@@ -130,9 +202,7 @@ export function useWeeklyHistory({ habitsData, weeklyData, fitnessData, mentalDa
       }
 
       const lifeScore = calcLifeScore(scores)
-
-      // Only include weeks where at least one pillar has data
-      const hasData = Object.values(scores).some(s => s > 0)
+      const hasData   = Object.values(scores).some(s => s > 0)
       if (hasData) {
         weeks.push({ week: weekStart, score: lifeScore, scores })
       }
