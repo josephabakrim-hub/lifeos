@@ -73,7 +73,7 @@ export function useSocial() {
     const day = d.getDay()
     const diff = d.getDate() - day + (day === 0 ? -6 : 1)
     d.setDate(diff)
-    return d.toISOString().split('T')[0]
+    return formatDate(d)
   }
 
   function getCurrentLog() {
@@ -134,8 +134,8 @@ export function useSocial() {
   }
 
   function getInsights() {
-    const sevenDaysAgo  = (() => { const d = new Date(); d.setDate(d.getDate() - 7);  return d.toISOString().split('T')[0] })()
-    const thirtyDaysAgo = (() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().split('T')[0] })()
+    const sevenDaysAgo  = (() => { const d = new Date(); d.setDate(d.getDate() - 7);  return formatDate(d) })()
+    const thirtyDaysAgo = (() => { const d = new Date(); d.setDate(d.getDate() - 30); return formatDate(d) })()
 
     const neglected7  = people.filter(p => !p.archived && (!p.lastContacted || p.lastContacted < sevenDaysAgo))
     const neglected30 = people.filter(p => !p.archived && (!p.lastContacted || p.lastContacted < thirtyDaysAgo))
