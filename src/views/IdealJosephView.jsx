@@ -54,10 +54,8 @@ function GapMeter({ actual, ideal, color }) {
 // Each bar = one week's total Life Score. Score printed in the middle of the bar.
 // A horizontal gold dashed line sits at Ideal Joseph's score across the whole chart.
 
-function WeeklyBarChart({ weeklyHistory = [], idealScore, extended }) {
-  const weeks = extended
-    ? weeklyHistory.slice(-30)
-    : weeklyHistory.slice(-12)
+function WeeklyBarChart({ weeklyHistory = [], idealScore, weeksCount }) {
+  const weeks = weeklyHistory.slice(-weeksCount)
 
   if (!weeks.length) {
     return (
@@ -217,7 +215,7 @@ function ProgressCurveChart({ weeklyHistory = [], pillarScores, idealScore }) {
   const [timeframe, setTimeframe] = useState('weekly')
   const [hoveredIdx, setHoveredIdx] = useState(null)
   const [chartView, setChartView] = useState('curve') // 'curve' | 'bars'
-  const [extended, setExtended]   = useState(false)    // false=12wks, true=30wks
+  const [weeksCount, setWeeksCount] = useState(12)    // 6, 12, or 30
 
   // ── Build daily data from weeklyHistory pillar breakdowns ────────────────
   // We approximate daily by interpolating between weekly data points
@@ -367,17 +365,15 @@ function ProgressCurveChart({ weeklyHistory = [], pillarScores, idealScore }) {
       {/* Bar chart view */}
       {chartView === 'bars' && (
         <>
-          <div style={{ display: 'flex', gap: 4, background: 'var(--bg3)', padding: 3, borderRadius: 8, border: '1px solid var(--border)', marginBottom: 12, alignSelf: 'flex-start', width: 'fit-content' }}>
-            <button onClick={() => setExtended(false)}
-              style={{ padding: '4px 14px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', background: !extended ? 'var(--accent)' : 'transparent', color: !extended ? '#fff' : 'var(--text3)', transition: 'all 0.15s' }}>
-              Last 12 wks
-            </button>
-            <button onClick={() => setExtended(true)}
-              style={{ padding: '4px 14px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', background: extended ? 'var(--accent)' : 'transparent', color: extended ? '#fff' : 'var(--text3)', transition: 'all 0.15s' }}>
-              Last 30 wks
-            </button>
+          <div style={{ display: 'flex', gap: 2, background: 'var(--bg3)', padding: 3, borderRadius: 8, border: '1px solid var(--border)', marginBottom: 12, alignSelf: 'flex-start', width: 'fit-content' }}>
+            {[6, 12, 30].map(n => (
+              <button key={n} onClick={() => setWeeksCount(n)}
+                style={{ padding: '4px 14px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', background: weeksCount === n ? 'var(--accent)' : 'transparent', color: weeksCount === n ? '#fff' : 'var(--text3)', transition: 'all 0.15s' }}>
+                Last {n} wks
+              </button>
+            ))}
           </div>
-          <WeeklyBarChart weeklyHistory={weeklyHistory} idealScore={idealScore} extended={extended} />
+          <WeeklyBarChart weeklyHistory={weeklyHistory} idealScore={idealScore} weeksCount={weeksCount} />
         </>
       )}
 
