@@ -106,6 +106,17 @@ export function useGoals() {
     await updateDoc(doc(db, 'lo_goals', goalId), { milestones, progress, updatedAt: new Date().toISOString() })
   }
 
+  async function editTask(goalId, milestoneIndex, taskId, updates) {
+    const goal = goals.find(g => g.id === goalId)
+    if (!goal) return
+    const milestones = [...(goal.milestones || [])]
+    const tasks = (milestones[milestoneIndex].tasks || []).map(t =>
+      t.id === taskId ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
+    )
+    milestones[milestoneIndex] = { ...milestones[milestoneIndex], tasks }
+    await updateDoc(doc(db, 'lo_goals', goalId), { milestones, updatedAt: new Date().toISOString() })
+  }
+
   // Set ⚡ next action — only one per goal at a time
   async function setNextAction(goalId, milestoneIndex, taskId) {
     const goal = goals.find(g => g.id === goalId)
@@ -201,6 +212,7 @@ export function useGoals() {
     addTask,
     toggleTask,
     deleteTask,
+    editTask,
     setNextAction,
     logDailyOneThing,
     getWeekScore,

@@ -345,9 +345,81 @@ function AddTaskForm({ onAdd, onCancel }) {
 
 // ─── Task row ─────────────────────────────────────────────────────────────────
 
-function TaskRow({ task, onToggle, onDelete, onSetNextAction }) {
-  const [expanded, setExpanded] = useState(false)
+function TaskRow({ task, onToggle, onDelete, onSetNextAction, onEdit }) {
+  const [expanded,      setExpanded]      = useState(false)
+  const [editing,       setEditing]       = useState(false)
+  const [editText,      setEditText]      = useState(task.text)
+  const [editIntention, setEditIntention] = useState(task.intention || '')
+  const [editEnvCue,    setEditEnvCue]    = useState(task.envCue || '')
+  const [editTwoMin,    setEditTwoMin]    = useState(task.twoMinVersion || '')
+  const [showEditExtras,setShowEditExtras]= useState(!!(task.intention || task.envCue || task.twoMinVersion))
+
   const hasExtras = task.intention || task.envCue || task.twoMinVersion
+
+  function handleSaveEdit() {
+    if (!editText.trim()) return
+    onEdit({
+      text:          editText.trim(),
+      intention:     editIntention.trim(),
+      envCue:        editEnvCue.trim(),
+      twoMinVersion: editTwoMin.trim(),
+    })
+    setEditing(false)
+  }
+
+  function handleCancelEdit() {
+    setEditText(task.text)
+    setEditIntention(task.intention || '')
+    setEditEnvCue(task.envCue || '')
+    setEditTwoMin(task.twoMinVersion || '')
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div style={{
+        borderRadius: 8, marginBottom: 5, overflow: 'hidden',
+        background: 'rgba(124,106,255,0.06)',
+        border: '1px solid rgba(124,106,255,0.4)',
+        padding: '10px 12px',
+      }}>
+        <input
+          autoFocus
+          value={editText}
+          onChange={e => setEditText(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') handleCancelEdit() }}
+          style={{ fontSize: 13, marginBottom: 8, width: '100%' }}
+        />
+
+        {!showEditExtras ? (
+          <button
+            onClick={() => setShowEditExtras(true)}
+            style={{ fontSize: 11, color: '#7c6aff', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 8 }}
+          >+ Edit intention, env cue, 2-min starter</button>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 10 }}>
+            <div>
+              <label style={{ fontSize: 11, color: '#9f91ff', display: 'block', marginBottom: 3 }}>⚡ Implementation intention</label>
+              <input value={editIntention} onChange={e => setEditIntention(e.target.value)} placeholder='e.g. "Every Monday 9am at my desk..."' style={{ fontSize: 12 }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: '#f59e0b', display: 'block', marginBottom: 3 }}>📍 Environment cue</label>
+              <input value={editEnvCue} onChange={e => setEditEnvCue(e.target.value)} placeholder='e.g. "Sticky note on monitor"' style={{ fontSize: 12 }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: '#22c55e', display: 'block', marginBottom: 3 }}>🟢 2-minute starter</label>
+              <input value={editTwoMin} onChange={e => setEditTwoMin(e.target.value)} placeholder='e.g. "Just open my journal and write one line"' style={{ fontSize: 12 }} />
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="btn btn-sm btn-primary" onClick={handleSaveEdit}>Save</button>
+          <button className="btn btn-sm" onClick={handleCancelEdit}>Cancel</button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{
@@ -392,6 +464,12 @@ function TaskRow({ task, onToggle, onDelete, onSetNextAction }) {
               style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text3)' }}
             >{expanded ? '▲' : '▼'}</button>
           )}
+          {/* Edit button */}
+          <button
+            onClick={() => setEditing(true)}
+            title="Edit task"
+            style={{ padding: '2px 6px', borderRadius: 4, fontSize: 11, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text3)' }}
+          >✏️</button>
           <button
             onClick={onSetNextAction}
             title={task.isNextAction ? 'Remove next action' : 'Mark as next action'}
@@ -429,7 +507,7 @@ function TaskRow({ task, onToggle, onDelete, onSetNextAction }) {
 
 // ─── Milestone row with task layer ───────────────────────────────────────────
 
-function MilestoneBlock({ milestone, milestoneIndex, goalId, onToggleMilestone, onAddTask, onToggleTask, onDeleteTask, onSetNextAction }) {
+function MilestoneBlock({ milestone, milestoneIndex, goalId, onToggleMilestone, onAddTask, onToggleTask, onDeleteTask, onSetNextAction, onEditTask }) {
   const [showAddTask, setShowAddTask] = useState(false)
   const [tasksOpen,   setTasksOpen]   = useState(true)
   const tasks     = milestone.tasks || []
@@ -494,6 +572,7 @@ function MilestoneBlock({ milestone, milestoneIndex, goalId, onToggleMilestone, 
               onToggle={() => onToggleTask(goalId, milestoneIndex, task.id)}
               onDelete={() => onDeleteTask(goalId, milestoneIndex, task.id)}
               onSetNextAction={() => onSetNextAction(goalId, milestoneIndex, task.id)}
+              onEdit={(updates) => onEditTask(goalId, milestoneIndex, task.id, updates)}
             />
           ))}
 
@@ -519,6 +598,8 @@ function MilestoneBlock({ milestone, milestoneIndex, goalId, onToggleMilestone, 
 // ─── WOOP display (compact, inside expanded goal) ─────────────────────────────
 
 function WOOPDisplay({ woop, onEdit }) {
+  const [collapsed, setCollapsed] = useState(false)
+
   if (!woop?.wish) return (
     <div style={{
       padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
@@ -545,22 +626,38 @@ function WOOPDisplay({ woop, onEdit }) {
 
   return (
     <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(159,145,255,0.05)', border: '1px solid rgba(159,145,255,0.2)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+      {/* Header — click anywhere to collapse/expand */}
+      <div
+        onClick={() => setCollapsed(p => !p)}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: collapsed ? 0 : 10, cursor: 'pointer', userSelect: 'none' }}
+      >
         <span style={{ fontSize: 12, fontWeight: 700, color: '#9f91ff', textTransform: 'uppercase', letterSpacing: 0.5 }}>🔮 WOOP</span>
-        <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={onEdit}>Edit</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            className="btn btn-sm"
+            style={{ fontSize: 11 }}
+            onClick={e => { e.stopPropagation(); onEdit() }}
+          >Edit</button>
+          <span style={{ fontSize: 11, color: 'var(--text3)', transition: 'transform 0.2s', display: 'inline-block', transform: collapsed ? 'rotate(0deg)' : 'rotate(180deg)' }}>▼</span>
+        </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        {items.map(item => item.value && (
-          <div key={item.label} style={{ padding: '8px 10px', borderRadius: 8, background: item.color + '10', border: `1px solid ${item.color}25` }}>
-            <div style={{ fontSize: 10, color: item.color, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>
-              {item.icon} {item.label}
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>{item.value}</div>
+
+      {!collapsed && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {items.map(item => item.value && (
+              <div key={item.label} style={{ padding: '8px 10px', borderRadius: 8, background: item.color + '10', border: `1px solid ${item.color}25` }}>
+                <div style={{ fontSize: 10, color: item.color, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>
+                  {item.icon} {item.label}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>{item.value}</div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      {woop.updatedAt && (
-        <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 8 }}>Last updated {woop.updatedAt}</div>
+          {woop.updatedAt && (
+            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 8 }}>Last updated {woop.updatedAt}</div>
+          )}
+        </>
       )}
     </div>
   )
@@ -571,7 +668,7 @@ function WOOPDisplay({ woop, onEdit }) {
 function GoalCard({
   goal, isExpanded, onToggleExpand,
   updateGoal, deleteGoal, toggleMilestone,
-  addTask, toggleTask, deleteTask, setNextAction,
+  addTask, toggleTask, deleteTask, setNextAction, editTask,
   logDailyOneThing, onWOOP, onEdit,
 }) {
   const category       = CATEGORIES.includes(goal.category) ? goal.category : 'Other'
@@ -806,6 +903,7 @@ function GoalCard({
                   onToggleTask={toggleTask}
                   onDeleteTask={deleteTask}
                   onSetNextAction={setNextAction}
+                  onEditTask={editTask}
                 />
               ))}
             </div>
@@ -1101,7 +1199,7 @@ export default function GoalsView({
   goals, loading,
   addGoal, updateGoal, deleteGoal,
   toggleMilestone,
-  addTask, toggleTask, deleteTask, setNextAction,
+  addTask, toggleTask, deleteTask, setNextAction, editTask,
   logDailyOneThing,
   getWeekScore,
   getNextActions,
@@ -1308,6 +1406,7 @@ export default function GoalsView({
               toggleTask={toggleTask}
               deleteTask={deleteTask}
               setNextAction={setNextAction}
+              editTask={editTask}
               logDailyOneThing={logDailyOneThing}
               onWOOP={(goal) => { setWOOPGoal(goal); setShowWOOPModal(true) }}
               onEdit={(goal) => { setEditGoal(goal); setShowGoalModal(true) }}
