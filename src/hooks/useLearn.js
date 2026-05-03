@@ -3,6 +3,9 @@ import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, order
 import { db } from '../lib/firebase'
 import { formatDate, getWeekStart } from '../lib/utils'
 
+// Book extract scoring weight vs a real read session (0.8 = 80%)
+export const BOOK_EXTRACT_WEIGHT = 0.8
+
 // Spaced repetition intervals in days based on recall rating 1–5
 function nextInterval(currentInterval, recallRating) {
   if (recallRating <= 1) return 1
@@ -77,7 +80,103 @@ export function useLearn() {
     })
   }
 
-  // Cancel or postpone a scheduled recall.
+  async function addBookExtract(extractData) {
+    // extractData: { bookTitle, author, topic, cards: [{id, type, front, back}] }
+    const today = formatDate()
+    const cards = extractData.cards.map((card, idx) => ({
+      ...card,
+      nextReviewDate: addDays(today, INITIAL_INTERVAL + idx), // stagger initial reviews
+      currentInterval: INITIAL_INTERVAL,
+      reviewHistory: [],
+      lastRecallRating: null,
+    }))
+    await addDoc(collection(db, 'lo_learnings'), {
+      type: 'book_extract',
+      title: `${extractData.bookTitle} — Book Extract`,
+      bookTitle: extractData.bookTitle,
+      author: extractData.author,
+      topic: extractData.topic || 'Personal growth',
+      cards,
+      date: today,
+      // No single nextReviewDate — cards have individual schedules
+      nextReviewDate: null,
+      currentInterval: null,
+      reviewHistory: [],
+      createdAt: new Date().toISOString(),
+      extractWeight: BOOK_EXTRACT_WEIGHT,
+    })
+  }
+
+  async function recordCardReview(extractId, cardId, recallRating) {
+    const extract = learnings.find(l => l.id === extractId)
+    if (!extract || !extract.cards) return
+    const today = formatDate()
+    const updatedCards = extract.cards.map(card => {
+      if (card.id !== cardId) return card
+      const currentInterval = card.currentInterval || INITIAL_INTERVAL
+      const newInterval     = nextInterval(currentInterval, recallRating)
+      return {
+        ...card,
+        nextReviewDate:   addDays(today, newInterval),
+        currentInterval:  newInterval,
+        lastReviewDate:   today,
+        lastRecallRating: recallRating,
+        reviewHistory: [...(card.reviewHistory || []), {
+          date: today, recallRating, intervalDays: newInterval,
+        }],
+      }
+    })
+    await updateDoc(doc(db, 'lo_learnings', extractId), {
+      cards: updatedCards,
+      updatedAt: new Date().toISOString(),
+    })
+  }
+
+  async function postponeCard(extractId, cardId, postponeDays = 0) {
+    const extract = learnings.find(l => l.id === extractId)
+    if (!extract || !extract.cards) return
+    const today = formatDate()
+    const updatedCards = extract.cards.map(card => {
+      if (card.id !== cardId) return card
+      return {
+        ...card,
+        nextReviewDate: postponeDays > 0 ? addDays(today, postponeDays) : null,
+      }
+    })
+    await updateDoc(doc(db, 'lo_learnings', extractId), {
+      cards: updatedCards,
+      updatedAt: new Date().toISOString(),
+    })
+  }
+
+  // Returns flat list of {extractId, extractTitle, bookTitle, author, topic, card} for due cards
+  function getDueCards() {
+    const today = formatDate()
+    const due = []
+    learnings.forEach(l => {
+      if (l.type !== 'book_extract' || !l.cards) return
+      l.cards.forEach(card => {
+        if (card.nextReviewDate && card.nextReviewDate <= today) {
+          due.push({ extractId: l.id, extractTitle: l.title, bookTitle: l.bookTitle, author: l.author, topic: l.topic, card })
+        }
+      })
+    })
+    return due
+  }
+
+  // Total due items: regular sessions + individual book extract cards
+  function getDueForReview() {
+    const today = formatDate()
+    const regularDue = learnings.filter(l => l.type !== 'book_extract' && l.nextReviewDate && l.nextReviewDate <= today)
+    const cardsDue   = getDueCards()
+    // Return unified list — regular items have .card = undefined, card items have .card
+    return [
+      ...regularDue,
+      ...cardsDue.map(d => ({ ...d, _isCard: true, id: `${d.extractId}::${d.card.id}` })),
+    ]
+  }
+
+
   // postponeDays = 0 → removes the review schedule entirely
   // postponeDays = 7 → pushes it 7 days from today
   async function cancelReview(id, postponeDays = 0) {
@@ -97,10 +196,10 @@ export function useLearn() {
     return learnings.filter(l => l.date >= weekStart && l.date <= today)
   }
 
-  // Items whose nextReviewDate is today or overdue (past dates only)
-  function getDueForReview() {
+  // Regular items only (non-extract) due for session-level review
+  function getDueRegular() {
     const today = formatDate()
-    return learnings.filter(l => l.nextReviewDate && l.nextReviewDate <= today)
+    return learnings.filter(l => l.type !== 'book_extract' && l.nextReviewDate && l.nextReviewDate <= today)
   }
 
   function getWeekScore() {
@@ -108,29 +207,46 @@ export function useLearn() {
     const today     = formatDate()
     const weekItems = getWeekLearnings()
 
-    // Source of truth: reviewHistory entries with dates in this week only.
-    // lastReviewDate is a document-level field that persists from previous weeks — never use it for scoring.
-    // Future nextReviewDate entries are scheduled but not yet done — they must not contribute to the score.
-    const weekReviews = learnings.flatMap(l =>
-      (l.reviewHistory || []).filter(r => r.date >= weekStart && r.date <= today)
-    )
+    // Regular session reviews this week
+    const weekReviews = learnings.flatMap(l => {
+      if (l.type === 'book_extract') return []
+      return (l.reviewHistory || []).filter(r => r.date >= weekStart && r.date <= today)
+    })
 
-    if (!weekItems.length && !weekReviews.length) return 0
+    // Book extract card reviews this week
+    const weekCardReviews = learnings.flatMap(l => {
+      if (l.type !== 'book_extract' || !l.cards) return []
+      return l.cards.flatMap(card =>
+        (card.reviewHistory || []).filter(r => r.date >= weekStart && r.date <= today)
+      )
+    })
 
-    const hoursLogged = weekItems.reduce((acc, l) => acc + (l.duration || 0), 0)
-    const notesCount  = weekItems.filter(l => l.takeaways?.length > 0).length
-    const applied     = weekItems.filter(l => l.applied).length
+    const allWeekReviews = [...weekReviews, ...weekCardReviews]
 
-    const reviewsDoneThisWeek = weekReviews.length
+    // Regular sessions only for hours/notes scoring
+    const regularItems = weekItems.filter(l => l.type !== 'book_extract')
+    // Book extract entries added this week
+    const extractItems = weekItems.filter(l => l.type === 'book_extract')
+
+    if (!weekItems.length && !allWeekReviews.length) return 0
+
+    const hoursLogged = regularItems.reduce((acc, l) => acc + (l.duration || 0), 0)
+    // Each book extract counts as 1.5h equivalent at 80% weight
+    const extractHours = extractItems.length * 1.5 * BOOK_EXTRACT_WEIGHT
+    const totalHours   = hoursLogged + extractHours
+
+    const notesCount  = regularItems.filter(l => l.takeaways?.length > 0).length
+    const applied     = regularItems.filter(l => l.applied).length
+
+    const reviewsDoneThisWeek = allWeekReviews.length
     const avgRecall = reviewsDoneThisWeek > 0
-      ? weekReviews.reduce((s, r) => s + r.recallRating, 0) / reviewsDoneThisWeek
+      ? allWeekReviews.reduce((s, r) => s + r.recallRating, 0) / reviewsDoneThisWeek
       : 0
 
-    const hoursScore   = Math.min(100, (hoursLogged / 7) * 100)
+    const hoursScore   = Math.min(100, (totalHours / 7) * 100)
     const notesScore   = Math.min(100, (notesCount / 7) * 100)
     const appliedScore = applied > 0 ? 100 : 0
 
-    // Explicitly 0 if nothing reviewed this week — future scheduled reviews don't count
     const reviewScore = reviewsDoneThisWeek === 0
       ? 0
       : Math.min(100, (reviewsDoneThisWeek / 3) * 100) * (avgRecall >= 3 ? 1 : 0.5)
@@ -143,13 +259,21 @@ export function useLearn() {
     )
   }
 
-  // Accurate weekly review count for display — uses reviewHistory, not lastReviewDate
+  // Accurate weekly review count — includes both session reviews and card reviews
   function getWeekReviewCount() {
     const weekStart = getWeekStart()
     const today     = formatDate()
-    return learnings.flatMap(l =>
-      (l.reviewHistory || []).filter(r => r.date >= weekStart && r.date <= today)
-    ).length
+    const sessionReviews = learnings.flatMap(l => {
+      if (l.type === 'book_extract') return []
+      return (l.reviewHistory || []).filter(r => r.date >= weekStart && r.date <= today)
+    }).length
+    const cardReviews = learnings.flatMap(l => {
+      if (l.type !== 'book_extract' || !l.cards) return []
+      return l.cards.flatMap(card =>
+        (card.reviewHistory || []).filter(r => r.date >= weekStart && r.date <= today)
+      )
+    }).length
+    return sessionReviews + cardReviews
   }
 
   function getTopicBreakdown() {
@@ -164,7 +288,9 @@ export function useLearn() {
   return {
     learnings, loading,
     addLearning, updateLearning, deleteLearning,
+    addBookExtract, recordCardReview, postponeCard,
     recordReview, cancelReview,
-    getWeekLearnings, getDueForReview, getWeekScore, getWeekReviewCount, getTopicBreakdown,
+    getWeekLearnings, getDueForReview, getDueRegular, getDueCards,
+    getWeekScore, getWeekReviewCount, getTopicBreakdown,
   }
 }

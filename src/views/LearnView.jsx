@@ -1,6 +1,28 @@
 import { useState, useMemo } from 'react'
 import { formatDate, scoreColor, getWeekStart } from '../lib/utils'
 
+// ─── Book Extract — pre-loaded library ───────────────────────────────────────
+
+const BOOK_LIBRARY = [
+  { id: 'titzone',    title: 'Trading in the Zone',      author: 'Mark Douglas',       topic: 'Trading',         emoji: '🧠' },
+  { id: 'disctrade',  title: 'The Disciplined Trader',   author: 'Mark Douglas',       topic: 'Trading',         emoji: '📈' },
+  { id: 'atomhab',    title: 'Atomic Habits',            author: 'James Clear',        topic: 'Personal growth', emoji: '⚡' },
+  { id: '12weekyr',   title: 'The 12 Week Year',         author: 'Brian Moran',        topic: 'Personal growth', emoji: '📅' },
+  { id: 'psytrade',   title: 'The Psychology of Trading',author: 'Brett Steenbarger',  topic: 'Trading',         emoji: '🔬' },
+  { id: 'mastery',    title: 'Mastery',                  author: 'Robert Greene',      topic: 'Personal growth', emoji: '🏆' },
+  { id: 'deepwork',   title: 'Deep Work',                author: 'Cal Newport',        topic: 'Personal growth', emoji: '🎯' },
+  { id: 'principles', title: 'Principles',               author: 'Ray Dalio',          topic: 'Business',        emoji: '⚖️' },
+  { id: '48laws',     title: 'The 48 Laws of Power',     author: 'Robert Greene',      topic: 'Business',        emoji: '♟️' },
+  { id: 'neversplit', title: 'Never Split the Difference',author: 'Chris Voss',        topic: 'Business',        emoji: '🤝' },
+]
+
+const CARD_TYPE_STYLES = {
+  Principle: { color: '#a855f7', bg: 'rgba(168,85,247,0.1)', icon: '💎' },
+  Framework: { color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', icon: '🗺️' },
+  'If-Then':  { color: '#14b8a6', bg: 'rgba(20,184,166,0.1)', icon: '⚡' },
+  Question:   { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', icon: '❓' },
+}
+
 const TOPICS = ['Trading', 'Teaching', 'Personal growth', 'Health', 'Finance', 'Business', 'Technology', 'Other']
 const TYPES = [
   { value: 'book',    label: '📖 Book' },
@@ -1262,29 +1284,557 @@ function LearnHistory({ learnings, onEdit, onDelete, onReview, onCancelReview })
   )
 }
 
-// ─── Main view ────────────────────────────────────────────────────────────────
+// ─── Book Extract Modal ───────────────────────────────────────────────────────
+
+function BookExtractModal({ onClose, onSave, existingExtracts }) {
+  const [step,        setStep]        = useState('pick') // pick | generating | review | saving
+  const [selectedBook, setSelectedBook] = useState(null)
+  const [cards,       setCards]       = useState([])
+  const [error,       setError]       = useState(null)
+  const [editingCard, setEditingCard] = useState(null) // index of card being edited
+  const [editFront,   setEditFront]   = useState('')
+  const [editBack,    setEditBack]    = useState('')
+
+  const extractedIds = new Set((existingExtracts || []).map(e => e.bookTitle))
+
+  async function generateExtract(book) {
+    setSelectedBook(book)
+    setStep('generating')
+    setError(null)
+    try {
+      const prompt = `You are extracting the most actionable, practical ideas from "${book.title}" by ${book.author} for a spaced repetition flashcard system.
+
+Generate exactly 10 flashcard-style ideas from this book. Each idea must be one of these types:
+- Principle: A core belief or truth that drives behaviour
+- Framework: A named model or system with clear steps/structure
+- If-Then: A specific trigger→action rule ("If X happens, then do Y")
+- Question: A powerful question that reframes thinking
+
+Rules:
+- Be specific and actionable — no fluff or summaries
+- Each card: a short FRONT (the prompt, max 15 words) and BACK (the answer/explanation, max 40 words)
+- Mix types intelligently based on what the book offers
+- Focus on what's immediately useful for a 29-year-old trader and ESL teacher in Vietnam
+
+Respond ONLY with a valid JSON array, no markdown, no explanation:
+[
+  {"id":"1","type":"Principle","front":"...","back":"..."},
+  {"id":"2","type":"If-Then","front":"...","back":"..."},
+  ...
+]`
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      })
+      const data = await response.json()
+      const raw  = data.content?.find(b => b.type === 'text')?.text || ''
+      const clean = raw.replace(/```json|```/g, '').trim()
+      const parsed = JSON.parse(clean)
+      if (!Array.isArray(parsed) || parsed.length < 5) throw new Error('Invalid response')
+      setCards(parsed)
+      setStep('review')
+    } catch (e) {
+      setError('Extraction failed. Check your connection and try again.')
+      setStep('pick')
+    }
+  }
+
+  function startEdit(idx) {
+    setEditingCard(idx)
+    setEditFront(cards[idx].front)
+    setEditBack(cards[idx].back)
+  }
+
+  function saveEdit(idx) {
+    setCards(prev => prev.map((c, i) => i === idx ? { ...c, front: editFront, back: editBack } : c))
+    setEditingCard(null)
+  }
+
+  function removeCard(idx) {
+    setCards(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  function handleSave() {
+    if (!selectedBook || cards.length < 3) return
+    onSave({ ...selectedBook, cards })
+    onClose()
+  }
+
+  const alreadyExtracted = selectedBook && extractedIds.has(selectedBook.title)
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexShrink: 0 }}>
+          <div>
+            <div className="modal-title" style={{ margin: 0 }}>📖 Extract a Book</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 3 }}>
+              Claude reads it. You drill it. 80% score weight vs a full read.
+            </div>
+          </div>
+          <button className="btn btn-sm" onClick={onClose}>✕</button>
+        </div>
+
+        {/* Step: Pick */}
+        {step === 'pick' && (
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {error && (
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', fontSize: 13, color: '#ef4444', marginBottom: 16 }}>
+                {error}
+              </div>
+            )}
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text2)', marginBottom: 10 }}>
+              Your library — select a book to extract
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {BOOK_LIBRARY.map(book => {
+                const done = extractedIds.has(book.title)
+                return (
+                  <div
+                    key={book.id}
+                    onClick={() => !done && generateExtract(book)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '12px 14px', borderRadius: 10, cursor: done ? 'default' : 'pointer',
+                      background: done ? 'var(--bg2)' : 'var(--bg3)',
+                      border: `1px solid ${done ? 'var(--border)' : 'var(--border2)'}`,
+                      opacity: done ? 0.6 : 1,
+                      transition: 'all 0.12s',
+                    }}
+                    onMouseEnter={e => { if (!done) e.currentTarget.style.borderColor = 'var(--accent)' }}
+                    onMouseLeave={e => { if (!done) e.currentTarget.style.borderColor = 'var(--border2)' }}
+                  >
+                    <span style={{ fontSize: 24 }}>{book.emoji}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{book.title}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text3)' }}>{book.author} · {book.topic}</div>
+                    </div>
+                    {done ? (
+                      <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>✓ Extracted</span>
+                    ) : (
+                      <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>Extract →</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Step: Generating */}
+        {step === 'generating' && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px', textAlign: 'center' }}>
+            <div style={{ fontSize: 48, marginBottom: 16, animation: 'spin 2s linear infinite' }}>📖</div>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Extracting {selectedBook?.title}...</div>
+            <div style={{ fontSize: 13, color: 'var(--text3)', lineHeight: 1.6 }}>
+              Claude is distilling the 10 most actionable ideas into flashcards.<br />
+              This takes about 10 seconds.
+            </div>
+          </div>
+        )}
+
+        {/* Step: Review */}
+        {step === 'review' && (
+          <>
+            <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(124,106,255,0.08)', border: '1px solid rgba(124,106,255,0.2)', marginBottom: 14, flexShrink: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>{selectedBook?.emoji} {selectedBook?.title}</div>
+              <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
+                {cards.length} cards extracted · Review and edit before saving · Cards are reviewed individually over 2 weeks
+              </div>
+            </div>
+
+            {/* Card type legend */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, flexShrink: 0 }}>
+              {Object.entries(CARD_TYPE_STYLES).map(([type, style]) => (
+                <span key={type} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 12, background: style.bg, color: style.color }}>
+                  {style.icon} {type}
+                </span>
+              ))}
+            </div>
+
+            <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {cards.map((card, idx) => {
+                const style = CARD_TYPE_STYLES[card.type] || CARD_TYPE_STYLES['Principle']
+                const isEditing = editingCard === idx
+                return (
+                  <div key={card.id} style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg3)', border: `1px solid ${style.color}40`, borderLeft: `3px solid ${style.color}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isEditing ? 10 : 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: style.bg, color: style.color }}>
+                        {style.icon} {card.type}
+                      </span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {isEditing ? (
+                          <>
+                            <button className="btn btn-sm" onClick={() => setEditingCard(null)}>Cancel</button>
+                            <button className="btn btn-sm btn-primary" onClick={() => saveEdit(idx)}>Save</button>
+                          </>
+                        ) : (
+                          <>
+                            <button className="btn btn-sm" onClick={() => startEdit(idx)}>✏️</button>
+                            <button className="btn btn-sm btn-danger" onClick={() => removeCard(idx)}>✕</button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {isEditing ? (
+                      <>
+                        <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, marginBottom: 4 }}>FRONT (prompt)</div>
+                        <input value={editFront} onChange={e => setEditFront(e.target.value)} style={{ marginBottom: 8, fontSize: 13 }} />
+                        <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, marginBottom: 4 }}>BACK (answer)</div>
+                        <textarea value={editBack} onChange={e => setEditBack(e.target.value)} rows={2} style={{ resize: 'vertical', fontSize: 13 }} />
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{card.front}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>{card.back}</div>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="modal-footer" style={{ flexShrink: 0, marginTop: 12 }}>
+              <button className="btn" onClick={() => { setStep('pick'); setCards([]) }}>← Re-pick book</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleSave}
+                disabled={cards.length < 3}
+              >
+                ✓ Save {cards.length} cards to library
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Card Recall Modal ────────────────────────────────────────────────────────
+
+function CardRecallModal({ cardItem, onClose, onSave }) {
+  // cardItem: { extractId, bookTitle, author, topic, card }
+  const [phase,  setPhase]  = useState('question') // question | answer | rate
+  const [rating, setRating] = useState(null)
+  const style = CARD_TYPE_STYLES[cardItem.card.type] || CARD_TYPE_STYLES['Principle']
+
+  function handleSave() {
+    if (!rating) return
+    onSave(cardItem.extractId, cardItem.card.id, rating)
+    onClose()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div className="modal-title" style={{ margin: 0 }}>🔁 Card Recall</div>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 12, background: style.bg, color: style.color }}>
+            {style.icon} {cardItem.card.type}
+          </span>
+        </div>
+
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>
+          {cardItem.bookTitle} · {cardItem.author}
+        </div>
+
+        {/* Question */}
+        <div style={{ padding: '16px 18px', borderRadius: 10, background: 'var(--bg3)', borderLeft: `3px solid ${style.color}`, marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>PROMPT</div>
+          <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.4 }}>{cardItem.card.front}</div>
+        </div>
+
+        {/* Answer — revealed on tap */}
+        {phase === 'question' ? (
+          <button
+            onClick={() => setPhase('answer')}
+            style={{ width: '100%', padding: '14px', borderRadius: 10, border: `1px dashed ${style.color}60`, background: `${style.bg}`, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: style.color, marginBottom: 16 }}
+          >
+            Tap to reveal answer →
+          </button>
+        ) : (
+          <div style={{ padding: '14px 16px', borderRadius: 10, background: `${style.bg}`, border: `1px solid ${style.color}40`, marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: style.color, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>ANSWER</div>
+            <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text)' }}>{cardItem.card.back}</div>
+          </div>
+        )}
+
+        {/* Rating — only shown after answer revealed */}
+        {phase === 'answer' && (
+          <>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>How well did you recall this?</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
+              {[1,2,3,4,5].map(r => {
+                const info   = RECALL_LABELS[r]
+                const active = rating === r
+                return (
+                  <div key={r} onClick={() => setRating(r)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px', borderRadius: 8, cursor: 'pointer', background: active ? `${info.color}18` : 'var(--bg3)', border: `1px solid ${active ? info.color : 'var(--border2)'}`, transition: 'all 0.1s' }}>
+                    <div style={{ width: 26, height: 26, borderRadius: '50%', background: active ? info.color : 'var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800, fontSize: 12, color: active ? '#fff' : 'var(--text3)' }}>{r}</div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: active ? info.color : 'var(--text)' }}>{info.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text3)' }}>{info.sub}</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSave} disabled={!rating}>Save recall</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Books Tab ────────────────────────────────────────────────────────────────
+
+function BooksTab({ extracts, dueCards, onAddExtract, onCardReview, onPostponeCard, onDeleteExtract }) {
+  const [recallingCard, setRecallingCard] = useState(null)
+  const [expandedId,    setExpandedId]    = useState(null)
+
+  const totalCards    = extracts.reduce((acc, e) => acc + (e.cards?.length || 0), 0)
+  const reviewedCards = extracts.reduce((acc, e) => acc + (e.cards?.filter(c => c.reviewHistory?.length > 0).length || 0), 0)
+  const dueCount      = dueCards.length
+
+  return (
+    <div>
+      {/* Stats row */}
+      <div className="grid-4" style={{ marginBottom: 16 }}>
+        <div className="card" style={{ textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 800, color: 'var(--accent2)' }}>{extracts.length}</div>
+          <div style={{ fontSize: 13, color: 'var(--text3)' }}>Books extracted</div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>of 10 in library</div>
+        </div>
+        <div className="card" style={{ textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 800, color: 'var(--blue)' }}>{totalCards}</div>
+          <div style={{ fontSize: 13, color: 'var(--text3)' }}>Total cards</div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>{reviewedCards} reviewed</div>
+        </div>
+        <div className="card" style={{ textAlign: 'center', cursor: dueCount > 0 ? 'pointer' : 'default' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 800, color: dueCount > 0 ? '#f59e0b' : 'var(--text3)' }}>{dueCount}</div>
+          <div style={{ fontSize: 13, color: 'var(--text3)' }}>Cards due today</div>
+          <div style={{ fontSize: 11, color: dueCount > 0 ? '#f59e0b' : 'var(--text3)', marginTop: 4, fontWeight: dueCount > 0 ? 700 : 400 }}>
+            {dueCount > 0 ? 'Review now →' : 'All caught up'}
+          </div>
+        </div>
+        <div className="card" style={{ textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 800, color: 'var(--green)' }}>
+            {totalCards > 0 ? Math.round((reviewedCards / totalCards) * 100) : 0}%
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text3)' }}>Cards reviewed</div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Overall progress</div>
+        </div>
+      </div>
+
+      {/* Due cards banner */}
+      {dueCount > 0 && (
+        <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b', marginBottom: 8 }}>
+            🔁 {dueCount} card{dueCount !== 1 ? 's' : ''} due for recall today
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {dueCards.slice(0, 5).map(dc => {
+              const style = CARD_TYPE_STYLES[dc.card.type] || CARD_TYPE_STYLES['Principle']
+              return (
+                <div key={`${dc.extractId}::${dc.card.id}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border2)' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: style.bg, color: style.color, flexShrink: 0 }}>{style.icon} {dc.card.type}</span>
+                  <span style={{ fontSize: 13, flex: 1, color: 'var(--text2)' }}>{dc.card.front}</span>
+                  <button
+                    onClick={() => setRecallingCard(dc)}
+                    style={{ padding: '4px 12px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: '1px solid #f59e0b', background: 'rgba(245,158,11,0.12)', color: '#f59e0b', flexShrink: 0 }}
+                  >
+                    Review
+                  </button>
+                </div>
+              )
+            })}
+            {dueCount > 5 && (
+              <div style={{ fontSize: 12, color: 'var(--text3)', textAlign: 'center' }}>+{dueCount - 5} more due cards below</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Extract button */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text2)' }}>Your book extracts</div>
+        <button className="btn btn-primary" onClick={onAddExtract}>+ Extract a book</button>
+      </div>
+
+      {/* Extract list */}
+      {extracts.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">📖</div>
+          <h3>No book extracts yet</h3>
+          <p>Extract a book from the library above. Claude distils the 10 most actionable ideas into flashcards you drill over 2 weeks.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {extracts.map(extract => {
+            const cards       = extract.cards || []
+            const reviewed    = cards.filter(c => c.reviewHistory?.length > 0).length
+            const dueHere     = cards.filter(c => c.nextReviewDate && c.nextReviewDate <= formatDate()).length
+            const pct         = cards.length > 0 ? Math.round((reviewed / cards.length) * 100) : 0
+            const isExpanded  = expandedId === extract.id
+            const bookInfo    = BOOK_LIBRARY.find(b => b.title === extract.bookTitle) || {}
+
+            return (
+              <div key={extract.id} className="card">
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <span style={{ fontSize: 28, flexShrink: 0 }}>{bookInfo.emoji || '📖'}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{extract.bookTitle}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text3)' }}>by {extract.author}</span>
+                      {dueHere > 0 && (
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
+                          🔁 {dueHere} due
+                        </span>
+                      )}
+                      <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 10, background: 'rgba(34,197,94,0.1)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                        80% score weight
+                      </span>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                      <div style={{ flex: 1, height: 5, borderRadius: 3, background: 'var(--bg4)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', borderRadius: 3, background: pct === 100 ? 'var(--green)' : 'var(--accent)', width: `${pct}%`, transition: 'width 0.4s' }} />
+                      </div>
+                      <span style={{ fontSize: 12, color: 'var(--text3)', flexShrink: 0 }}>{reviewed}/{cards.length} reviewed ({pct}%)</span>
+                    </div>
+
+                    {/* Card type distribution */}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {Object.entries(
+                        cards.reduce((acc, c) => { acc[c.type] = (acc[c.type] || 0) + 1; return acc }, {})
+                      ).map(([type, count]) => {
+                        const s = CARD_TYPE_STYLES[type] || CARD_TYPE_STYLES['Principle']
+                        return (
+                          <span key={type} style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: s.bg, color: s.color }}>
+                            {s.icon} {count} {type}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                    <button className="btn btn-sm" onClick={() => setExpandedId(isExpanded ? null : extract.id)}>
+                      {isExpanded ? '▲ Hide' : '▼ Cards'}
+                    </button>
+                    <button className="btn btn-sm btn-danger" onClick={() => onDeleteExtract(extract.id)}>✕</button>
+                  </div>
+                </div>
+
+                {/* Expanded cards */}
+                {isExpanded && (
+                  <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 7, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+                    {cards.map(card => {
+                      const s      = CARD_TYPE_STYLES[card.type] || CARD_TYPE_STYLES['Principle']
+                      const isDue  = card.nextReviewDate && card.nextReviewDate <= formatDate()
+                      const done   = card.reviewHistory?.length > 0
+                      const daysLeft = card.nextReviewDate ? Math.round((new Date(card.nextReviewDate + 'T12:00:00') - new Date(formatDate() + 'T12:00:00')) / 86400000) : null
+
+                      return (
+                        <div key={card.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 9, background: isDue ? 'rgba(245,158,11,0.04)' : 'var(--bg3)', border: `1px solid ${isDue ? 'rgba(245,158,11,0.3)' : 'var(--border2)'}` }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 10, background: s.bg, color: s.color }}>{s.icon} {card.type}</span>
+                              {done && <span style={{ fontSize: 11, color: 'var(--green)' }}>✓ {card.reviewHistory.length} review{card.reviewHistory.length !== 1 ? 's' : ''}</span>}
+                              {isDue && <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>🔁 Due now</span>}
+                              {!isDue && daysLeft !== null && daysLeft > 0 && <span style={{ fontSize: 11, color: 'var(--text3)' }}>Next review in {daysLeft}d</span>}
+                              {card.lastRecallRating && <span style={{ fontSize: 11, color: RECALL_LABELS[card.lastRecallRating]?.color }}>Last: {RECALL_LABELS[card.lastRecallRating]?.label}</span>}
+                            </div>
+                            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{card.front}</div>
+                            <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>{card.back}</div>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+                            <button
+                              onClick={() => setRecallingCard({ extractId: extract.id, bookTitle: extract.bookTitle, author: extract.author, topic: extract.topic, card })}
+                              style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${isDue ? '#f59e0b' : 'var(--border2)'}`, background: isDue ? 'rgba(245,158,11,0.12)' : 'var(--bg4)', color: isDue ? '#f59e0b' : 'var(--text3)', whiteSpace: 'nowrap' }}
+                            >
+                              🔁 {isDue ? 'Review' : 'Recall'}
+                            </button>
+                            {card.nextReviewDate && (
+                              <button
+                                onClick={() => onPostponeCard(extract.id, card.id, 7)}
+                                style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, cursor: 'pointer', border: '1px solid var(--border2)', background: 'var(--bg4)', color: 'var(--text3)', whiteSpace: 'nowrap' }}
+                              >
+                                ⏭️ +7d
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {recallingCard && (
+        <CardRecallModal
+          cardItem={recallingCard}
+          onClose={() => setRecallingCard(null)}
+          onSave={(extractId, cardId, rating) => {
+            onCardReview(extractId, cardId, rating)
+            setRecallingCard(null)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+
 
 export default function LearnView({
   learnings, loading,
   addLearning, updateLearning, deleteLearning,
+  addBookExtract, recordCardReview, postponeCard,
   recordReview, cancelReview,
-  getWeekLearnings, getDueForReview, getWeekScore, getWeekReviewCount, getTopicBreakdown,
+  getWeekLearnings, getDueForReview, getDueCards, getWeekScore, getWeekReviewCount, getTopicBreakdown,
 }) {
-  const [showModal,   setShowModal]   = useState(false)
-  const [editItem,    setEditItem]    = useState(null)
-  const [innerTab,    setInnerTab]    = useState('week')
-  const [sortBy,      setSortBy]      = useState('date')
-  const [filterTopic, setFilterTopic] = useState('All')
+  const [showModal,       setShowModal]       = useState(false)
+  const [showExtractModal,setShowExtractModal] = useState(false)
+  const [editItem,        setEditItem]        = useState(null)
+  const [innerTab,        setInnerTab]        = useState('week')
+  const [sortBy,          setSortBy]          = useState('date')
+  const [filterTopic,     setFilterTopic]     = useState('All')
 
   const weekItems  = getWeekLearnings()
   const weekScore  = getWeekScore()
-  const weekHours  = weekItems.reduce((acc, l) => acc + (l.duration || 0), 0)
+  const weekHours  = weekItems.filter(l => l.type !== 'book_extract').reduce((acc, l) => acc + (l.duration || 0), 0)
   const dueItems   = getDueForReview ? getDueForReview() : []
+  // Regular session-level due items only (for legacy review tab)
+  const dueRegular = dueItems.filter(d => !d._isCard)
   const dueCount   = dueItems.length
   const weekReviewCount = getWeekReviewCount ? getWeekReviewCount() : 0
 
+  // Book extracts
+  const extracts   = learnings.filter(l => l.type === 'book_extract')
+  const dueCards   = getDueCards ? getDueCards() : []
+  const extractDueCount = dueCards.length
+
   const allSessions = useMemo(() => {
-    let items = [...learnings]
+    let items = [...learnings].filter(l => l.type !== 'book_extract')
     if (filterTopic !== 'All') items = items.filter(i => i.topic === filterTopic)
     if (sortBy === 'date')  items.sort((a, b) => b.date.localeCompare(a.date))
     if (sortBy === 'hours') items.sort((a, b) => (b.duration || 0) - (a.duration || 0))
@@ -1305,7 +1855,7 @@ export default function LearnView({
     return map
   }, [allSessions])
 
-  const existingTopics = [...new Set(learnings.map(l => l.topic))].sort()
+  const existingTopics = [...new Set(learnings.filter(l => l.type !== 'book_extract').map(l => l.topic))].sort()
 
   if (loading) return <div style={{ color: 'var(--text3)', padding: 40, textAlign: 'center' }}>Loading...</div>
 
@@ -1332,7 +1882,7 @@ export default function LearnView({
         </div>
         <div className="card" style={{ textAlign: 'center' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 800, color: 'var(--blue)' }}>
-            {weekItems.filter(l => l.noteData || l.takeaways?.length > 0).length}
+            {weekItems.filter(l => l.type !== 'book_extract' && (l.noteData || l.takeaways?.length > 0)).length}
           </div>
           <div style={{ fontSize: 13, color: 'var(--text3)' }}>Sessions with notes</div>
           <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Ideal: every session</div>
@@ -1358,13 +1908,15 @@ export default function LearnView({
         {[
           { id: 'week',     label: '📅 This Week' },
           { id: 'review',   label: `🔁 Review${dueCount > 0 ? ` (${dueCount})` : ''}` },
+          { id: 'books',    label: `📖 Books${extractDueCount > 0 ? ` (${extractDueCount})` : ''}` },
           { id: 'all',      label: '📚 All Sessions' },
           { id: 'calendar', label: '🗓️ Calendar' },
         ].map(t => (
           <button key={t.id} onClick={() => setInnerTab(t.id)} style={{
             padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
             background: 'none', border: 'none',
-            color: t.id === 'review' && dueCount > 0 && innerTab !== 'review'
+            color: (t.id === 'review' && dueCount > 0 && innerTab !== 'review') ||
+                   (t.id === 'books'  && extractDueCount > 0 && innerTab !== 'books')
               ? '#f59e0b'
               : innerTab === t.id ? 'var(--accent)' : 'var(--text3)',
             borderBottom: innerTab === t.id ? '2px solid var(--accent)' : '2px solid transparent',
@@ -1384,13 +1936,25 @@ export default function LearnView({
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {weekItems.map(item => (
+              {weekItems.filter(l => l.type !== 'book_extract').map(item => (
                 <LearningCard key={item.id} item={item}
                   onEdit={() => { setEditItem(item); setShowModal(true) }}
                   onDelete={() => deleteLearning(item.id)}
                   onReview={recordReview}
                   onCancelReview={cancelReview}
                 />
+              ))}
+              {extracts.filter(e => e.date >= getWeekStart()).map(e => (
+                <div key={e.id} className="card" style={{ borderLeft: '3px solid var(--accent2)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 22 }}>{BOOK_LIBRARY.find(b => b.title === e.bookTitle)?.emoji || '📖'}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{e.bookTitle}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text3)' }}>Book Extract · {e.cards?.length || 0} cards · 80% score weight</div>
+                    </div>
+                    <button className="btn btn-sm" onClick={() => setInnerTab('books')}>View cards →</button>
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -1400,10 +1964,22 @@ export default function LearnView({
       {/* ── REVIEW ── */}
       {innerTab === 'review' && (
         <ReviewTab
-          dueItems={dueItems}
+          dueItems={dueRegular}
           onReview={recordReview}
           onEdit={item => { setEditItem(item); setShowModal(true) }}
           onCancelReview={cancelReview}
+        />
+      )}
+
+      {/* ── BOOKS ── */}
+      {innerTab === 'books' && (
+        <BooksTab
+          extracts={extracts}
+          dueCards={dueCards}
+          onAddExtract={() => setShowExtractModal(true)}
+          onCardReview={recordCardReview}
+          onPostponeCard={postponeCard}
+          onDeleteExtract={deleteLearning}
         />
       )}
 
@@ -1456,7 +2032,7 @@ export default function LearnView({
 
       {/* ── CALENDAR ── */}
       {innerTab === 'calendar' && (
-        <LearnHistory learnings={learnings}
+        <LearnHistory learnings={learnings.filter(l => l.type !== 'book_extract')}
           onEdit={item => { setEditItem(item); setShowModal(true) }}
           onDelete={deleteLearning}
           onReview={recordReview}
@@ -1469,6 +2045,14 @@ export default function LearnView({
           editItem={editItem}
           onClose={() => setShowModal(false)}
           onSave={data => editItem ? updateLearning(editItem.id, data) : addLearning(data)}
+        />
+      )}
+
+      {showExtractModal && (
+        <BookExtractModal
+          existingExtracts={extracts}
+          onClose={() => setShowExtractModal(false)}
+          onSave={extractData => addBookExtract(extractData)}
         />
       )}
     </div>
