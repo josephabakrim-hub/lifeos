@@ -4,16 +4,156 @@ import { formatDate, scoreColor, getWeekStart } from '../lib/utils'
 // ─── Book Extract — pre-loaded library ───────────────────────────────────────
 
 const BOOK_LIBRARY = [
-  { id: 'titzone',    title: 'Trading in the Zone',      author: 'Mark Douglas',       topic: 'Trading',         emoji: '🧠' },
-  { id: 'disctrade',  title: 'The Disciplined Trader',   author: 'Mark Douglas',       topic: 'Trading',         emoji: '📈' },
-  { id: 'atomhab',    title: 'Atomic Habits',            author: 'James Clear',        topic: 'Personal growth', emoji: '⚡' },
-  { id: '12weekyr',   title: 'The 12 Week Year',         author: 'Brian Moran',        topic: 'Personal growth', emoji: '📅' },
-  { id: 'psytrade',   title: 'The Psychology of Trading',author: 'Brett Steenbarger',  topic: 'Trading',         emoji: '🔬' },
-  { id: 'mastery',    title: 'Mastery',                  author: 'Robert Greene',      topic: 'Personal growth', emoji: '🏆' },
-  { id: 'deepwork',   title: 'Deep Work',                author: 'Cal Newport',        topic: 'Personal growth', emoji: '🎯' },
-  { id: 'principles', title: 'Principles',               author: 'Ray Dalio',          topic: 'Business',        emoji: '⚖️' },
-  { id: '48laws',     title: 'The 48 Laws of Power',     author: 'Robert Greene',      topic: 'Business',        emoji: '♟️' },
-  { id: 'neversplit', title: 'Never Split the Difference',author: 'Chris Voss',        topic: 'Business',        emoji: '🤝' },
+  {
+    id: 'titzone', title: 'Trading in the Zone', author: 'Mark Douglas', topic: 'Trading', emoji: '🧠',
+    cards: [
+      { id: '1', type: 'Principle',  front: 'Every trade outcome is statistically independent', back: 'Losing last time has zero bearing on this trade. Your edge plays out over a series, not a single outcome. Treat each trade as one instance of a probability.' },
+      { id: '2', type: 'Principle',  front: 'The market doesn\'t know you exist', back: 'The market has no obligation to give you money. It isn\'t punishing or rewarding you personally. Price moves according to collective belief, not your position size.' },
+      { id: '3', type: 'Framework',  front: 'The 5 trading truths you must believe', back: '1) Anything can happen. 2) You don\'t need to know what happens next to make money. 3) There is a random distribution of wins and losses. 4) An edge is just a higher probability. 5) Every moment in the market is unique.' },
+      { id: '4', type: 'If-Then',    front: 'If I feel certain about a trade\'s outcome', back: 'Then I am in a mental danger zone. Certainty breeds overconfidence, oversizing, and failure to cut losses. Remind yourself: I only have an edge, not a guarantee.' },
+      { id: '5', type: 'Principle',  front: 'Define your risk before you enter — always', back: 'The moment you enter without a defined stop is the moment the market controls you, not the other way around. Risk is the only variable you fully control.' },
+      { id: '6', type: 'If-Then',    front: 'If a loss triggers anger or revenge trading', back: 'Then your belief system is broken, not your strategy. Anger is evidence that you expected an outcome the market didn\'t owe you. Step away and reset.' },
+      { id: '7', type: 'Framework',  front: 'Two minds: analytical vs. trading mind', back: 'Analytical mind sees patterns in hindsight clearly. Trading mind must act in the live moment with uncertainty. You must train the trading mind separately through screen time and discipline.' },
+      { id: '8', type: 'Principle',  front: 'Consistency comes from a consistent mental state', back: 'You can\'t think your way to discipline. You build it by executing your rules repeatedly until belief in your edge is deeper than fear of the next loss.' },
+      { id: '9', type: 'If-Then',    front: 'If you deviate from your rules once and win', back: 'Then the danger is greater than if you\'d lost. A random reward reinforces bad process and teaches your brain that rules are optional.' },
+      { id: '10', type: 'Question',  front: 'Am I trading my edge or trading my emotions right now?', back: 'Ask this before every entry. If you can\'t answer clearly, that\'s the answer. Emotional trading masquerades as analysis but is driven by fear, hope, or greed.' },
+    ]
+  },
+  {
+    id: 'disctrade', title: 'The Disciplined Trader', author: 'Mark Douglas', topic: 'Trading', emoji: '📈',
+    cards: [
+      { id: '1', type: 'Principle',  front: 'Fear is the primary obstacle to trading success', back: 'Fear of loss, fear of being wrong, fear of missing out. Each fear distorts perception and causes you to act against your own rules. Discipline is the antidote.' },
+      { id: '2', type: 'Framework',  front: 'Three stages of trader development', back: 'Stage 1: Mechanical — following rules rigidly. Stage 2: Subjective — reading the market contextually. Stage 3: Intuitive — pattern recognition without conscious thought. Most traders never leave Stage 1.' },
+      { id: '3', type: 'Principle',  front: 'Your beliefs about money shape every trade decision', back: 'If you believe money is scarce or that you don\'t deserve profits, you will unconsciously sabotage winning trades. Trading psychology begins with your relationship with money itself.' },
+      { id: '4', type: 'If-Then',    front: 'If you move your stop loss to avoid being stopped out', back: 'Then you are letting hope override your system. This is the single most dangerous habit a trader can have. A stop is a decision made when thinking was clear — honour it.' },
+      { id: '5', type: 'Principle',  front: 'The market is always right — your opinion is not', back: 'Having a strong view and holding a losing position are not the same as being a disciplined analyst. The market tells you the truth. Your opinion tells you what you wish were true.' },
+      { id: '6', type: 'Question',   front: 'What rule am I about to break, and why?', back: 'State it out loud before breaking it. Making the justification explicit often exposes it as rationalisation. Most rule-breaks happen in silence, which is where they gain their power.' },
+      { id: '7', type: 'Framework',  front: 'The pain-avoidance loop that destroys traders', back: 'Pain of loss → avoid losses → widen stops or hold losers → bigger loss → more pain. Breaking the loop requires accepting small losses as the cost of participation, not failures.' },
+      { id: '8', type: 'If-Then',    front: 'If a trade hits your target and you feel reluctant to exit', back: 'Then greed has entered the picture. Take the profit. You can always re-enter. Greed at exits is as destructive as fear at entries.' },
+      { id: '9', type: 'Principle',  front: 'Mental rehearsal before the session is not optional', back: 'Elite traders pre-experience likely scenarios before the open. When the scenario plays out live, the disciplined response is already wired. Reaction time and emotion are both reduced.' },
+      { id: '10', type: 'Question',  front: 'Is this trade based on my system or my need to be active?', back: 'Boredom is one of the most underrated causes of bad trades. The need to participate is not a signal. If no setup exists, do nothing — that is also a disciplined decision.' },
+    ]
+  },
+  {
+    id: 'atomhab', title: 'Atomic Habits', author: 'James Clear', topic: 'Personal growth', emoji: '⚡',
+    cards: [
+      { id: '1', type: 'Principle',  front: '1% better every day is 37× better by year end', back: 'Habits are the compound interest of self-improvement. Small consistent improvements feel invisible in the moment but produce extraordinary results over years. The math forces this conclusion.' },
+      { id: '2', type: 'Framework',  front: 'The 4 laws of behaviour change', back: 'Make it Obvious (cue) → Make it Attractive (craving) → Make it Easy (response) → Make it Satisfying (reward). To break a bad habit, invert each law: invisible, unattractive, difficult, unsatisfying.' },
+      { id: '3', type: 'Principle',  front: 'Identity drives habits — not outcomes or processes', back: 'Don\'t aim to read more. Aim to be a reader. Every action is a vote for the identity you want to become. Habits are the evidence you collect about who you are.' },
+      { id: '4', type: 'Framework',  front: 'Habit stacking: anchor new habits to existing ones', back: 'Formula: After [current habit], I will [new habit]. Example: After morning coffee, I will review my trading plan. The existing habit becomes a reliable cue requiring no willpower.' },
+      { id: '5', type: 'If-Then',    front: 'If the environment makes bad habits easy', back: 'Then willpower will lose every time. Redesign the environment. Put the book on the pillow. Remove the phone from the desk. Architecture beats intention.' },
+      { id: '6', type: 'Principle',  front: 'Never miss twice — the real rule', back: 'Missing once is an accident. Missing twice is the start of a new habit. One bad day doesn\'t ruin progress. Two in a row starts a downward spiral. The second miss is where the habit dies.' },
+      { id: '7', type: 'Framework',  front: 'The Goldilocks Rule for sustained motivation', back: 'Humans peak in motivation when working at the edge of their ability — hard enough to stretch, easy enough to succeed. Design habits to stay in this zone. Too easy = boredom. Too hard = anxiety.' },
+      { id: '8', type: 'If-Then',    front: 'If a habit feels hard to start', back: 'Then the implementation intention is missing. Specify when, where, and how: "I will [behaviour] at [time] in [location]." Vague intentions fail. Specific plans execute.' },
+      { id: '9', type: 'Principle',  front: 'Make the reward immediate, not distant', back: 'The brain rewards behaviour that feels good now. If the benefit of a habit is months away, add an immediate reward. Track it, celebrate it, or pair it with something enjoyable.' },
+      { id: '10', type: 'Question',  front: 'Does my environment make the right thing the default?', back: 'Audit your space. The choice architecture around you either supports or fights your habits. Friction is the enemy of new habits and the friend of habit-breaking.' },
+    ]
+  },
+  {
+    id: '12weekyr', title: 'The 12 Week Year', author: 'Brian Moran', topic: 'Personal growth', emoji: '📅',
+    cards: [
+      { id: '1', type: 'Principle',  front: 'A year is too long — it creates false safety', back: 'Annual planning breeds complacency. When the deadline is 12 months away, urgency is absent until Q4. Compress the year to 12 weeks and every week becomes critical.' },
+      { id: '2', type: 'Framework',  front: 'The 12 Week Year system in 4 steps', back: '1) Set 12-week goals (no more than 3). 2) Create a weekly tactical plan. 3) Score your execution weekly. 4) Conduct a weekly accountability review. Repeat every 12 weeks with new goals.' },
+      { id: '3', type: 'Principle',  front: 'Execution score, not results, is the leading indicator', back: 'You cannot control outcomes — you can control actions. Score your weekly execution (tasks completed / tasks planned). A score of 85%+ consistently produces results. Below 85%: fix the plan, not the goal.' },
+      { id: '4', type: 'If-Then',    front: 'If your weekly plan has more than 5 priority tasks', back: 'Then it isn\'t a plan — it\'s a wishlist. Ruthlessly limit weekly priorities to the actions that produce the biggest results toward your 12-week goals. Everything else waits.' },
+      { id: '5', type: 'Framework',  front: 'The three principles: Accountability, Commitment, Greatness in the Moment', back: 'Accountability = ownership without blame. Commitment = doing what you said regardless of how you feel. Greatness in the Moment = each action executed fully, present, with intention.' },
+      { id: '6', type: 'Principle',  front: 'Vision without tension is just daydreaming', back: 'A compelling vision creates productive tension between where you are and where you want to be. That tension is the fuel for action. Without a clear vision, urgency has no direction.' },
+      { id: '7', type: 'If-Then',    front: 'If Week 1 execution is low', back: 'Then do not adjust the goal — adjust the daily plan. Most underperformance is a planning failure, not a goal problem. Diagnose the gap before changing anything.' },
+      { id: '8', type: 'Question',   front: 'Is my current week aligned with my 12-week goal?', back: 'Ask every Monday. If your scheduled tasks don\'t directly move your 12-week goals forward, you are managing tasks, not executing strategy. Realign before the week starts.' },
+      { id: '9', type: 'Principle',  front: 'Peer accountability is the most underused lever', back: 'A weekly check-in with one trusted person who asks "Did you do what you said?" changes behaviour more than any app or system. Social accountability is the oldest performance tool.' },
+      { id: '10', type: 'Framework', front: 'The Performance Time model: Strategic, Buffer, Breakout', back: 'Strategic time = deep work on your highest-leverage activities (15–20h/week). Buffer time = reactive tasks, email, admin. Breakout time = real rest that recharges capacity. Block all three.' },
+    ]
+  },
+  {
+    id: 'psytrade', title: 'The Psychology of Trading', author: 'Brett Steenbarger', topic: 'Trading', emoji: '🔬',
+    cards: [
+      { id: '1', type: 'Principle',  front: 'Trading performance is a skill that can be trained', back: 'Steenbarger treats trading like athletic performance: it can be systematically developed through deliberate practice, feedback loops, and psychological self-coaching. Random screen time is not practice.' },
+      { id: '2', type: 'Framework',  front: 'Solution-focused self-coaching in 3 questions', back: '1) When am I at my trading best? 2) What am I doing differently in those moments? 3) How do I recreate those conditions consistently? Focus on replicating peaks, not eliminating flaws.' },
+      { id: '3', type: 'If-Then',    front: 'If emotional arousal is high before a trade', back: 'Then wait. High arousal — positive or negative — narrows attention and accelerates poor decisions. Develop a pre-trade routine that brings arousal to a calm, alert baseline.' },
+      { id: '4', type: 'Principle',  front: 'Your trading problems are patterns, not random failures', back: 'Keep a process journal. The same mistakes repeat because they are driven by the same underlying patterns — overconfidence after wins, revenge after losses. Name the pattern to break it.' },
+      { id: '5', type: 'Framework',  front: 'The biofeedback principle for traders', back: 'Physical state drives mental state. Heart rate, breathing, and muscle tension all affect decision quality. A pre-session physical routine (breathing, movement) measurably improves execution quality.' },
+      { id: '6', type: 'If-Then',    front: 'If you are reviewing a losing day, focus on process first', back: 'Then ask: did I follow my plan? If yes and you lost, the edge needs review. If no and you lost, the discipline needs review. Never conflate outcome with process quality.' },
+      { id: '7', type: 'Principle',  front: 'Self-efficacy is built through mastery experiences', back: 'Confidence in trading comes from executing small, defined plans successfully — not from big wins. Design your practice to generate frequent proof that your process works.' },
+      { id: '8', type: 'Question',   front: 'What emotional state am I in right now, and is it safe to trade?', back: 'Not all emotional states produce equal decisions. Frustration, excitement, boredom, and anxiety all degrade judgment in different ways. Knowing your state is the first step to managing it.' },
+      { id: '9', type: 'Framework',  front: 'The performance zone model', back: 'Underarousal (boredom) → mistakes from inattention. Optimal zone → sharp, focused, decisive. Overarousal (stress/excitement) → impulsive, tunnel-visioned. Your job is to stay in the zone.' },
+      { id: '10', type: 'Principle', front: 'Deliberate practice requires immediate, accurate feedback', back: 'Screen time without journaling is not practice — it\'s repetition of existing patterns. Effective learning requires recording what you did, why you did it, and what happened as a result.' },
+    ]
+  },
+  {
+    id: 'mastery', title: 'Mastery', author: 'Robert Greene', topic: 'Personal growth', emoji: '🏆',
+    cards: [
+      { id: '1', type: 'Principle',  front: 'Your Life\'s Task is encoded in your deepest inclinations', back: 'Mastery begins by identifying what you were drawn to before the world told you what to value. These early inclinations point toward your unique path. Ignoring them leads to mediocrity and quiet misery.' },
+      { id: '2', type: 'Framework',  front: 'The three phases of Mastery', back: 'Phase 1: Apprenticeship — absorb, observe, submit. Phase 2: Creative-Active — experiment, take risks, develop your own voice. Phase 3: Mastery — intuitive, fluid, field-changing. Each requires different mental strategies.' },
+      { id: '3', type: 'Principle',  front: 'The Apprenticeship phase demands 10,000 hours of deep observation', back: 'Not just doing — watching the master closely, learning the unspoken rules of the field, absorbing tacit knowledge. The goal is not output. The goal is transformation of how you see and think.' },
+      { id: '4', type: 'If-Then',    front: 'If you feel bored or unchallenged in your current work', back: 'Then you are in the wrong phase or the wrong field. Boredom at the apprentice level signals either a mismatch with your Life\'s Task or insufficient depth of engagement. Diagnose before you quit.' },
+      { id: '5', type: 'Framework',  front: 'The Ideal Apprenticeship: the 3 steps', back: '1) Choose a place that offers the most learning, not the most money. 2) Find mentors who embody what you want to become. 3) After absorbing enough, move on before comfort sets in.' },
+      { id: '6', type: 'Principle',  front: 'Resistance to learning is the enemy of mastery', back: 'The greatest obstacle is the ego\'s need to already know. Masters maintain beginner\'s mind at every stage. They ask more questions than they answer and prefer being taught over being admired.' },
+      { id: '7', type: 'If-Then',    front: 'If a mentor relationship goes stale or becomes controlling', back: 'Then it is time to move on. The mentor\'s role is to accelerate your development, not to create dependency. Outgrowing a mentor is a sign of progress, not disloyalty.' },
+      { id: '8', type: 'Question',   front: 'Am I in accumulation mode or performance mode right now?', back: 'Mastery requires knowing which phase you are in. Apprentices who perform before they\'ve accumulated enough knowledge create shallow work. Masters who accumulate without output never realise their potential.' },
+      { id: '9', type: 'Principle',  front: 'Social intelligence is as critical as technical skill', back: 'Greene documents repeatedly how masters who lacked social intelligence were undermined, sidelined, or destroyed by those threatened by their talent. Understanding human nature protects your work.' },
+      { id: '10', type: 'Framework', front: 'The Dimensional Mind: convergence of intuition and knowledge', back: 'At mastery level, years of practice compress into instant pattern recognition. You see what others miss, feel the field, and act without deliberate analysis. This is not talent — it is accumulated depth surfacing.' },
+    ]
+  },
+  {
+    id: 'deepwork', title: 'Deep Work', author: 'Cal Newport', topic: 'Personal growth', emoji: '🎯',
+    cards: [
+      { id: '1', type: 'Principle',  front: 'Deep work is the superpower of the 21st century', back: 'The ability to focus without distraction on cognitively demanding tasks is becoming rare and increasingly valuable. Most people are optimising for busyness. Deep workers are optimising for output quality.' },
+      { id: '2', type: 'Framework',  front: 'The 4 philosophies of deep work scheduling', back: 'Monastic (near-total isolation), Bimodal (deep seasons + shallow seasons), Rhythmic (daily scheduled blocks), Journalistic (wherever gaps exist). Choose based on your constraints, not your preferences.' },
+      { id: '3', type: 'Principle',  front: 'Attention residue destroys cognitive quality', back: 'When you switch tasks, attention from the previous task bleeds into the new one. Multiple task-switches per day mean you never reach full depth on anything. Batch and block to minimise residue.' },
+      { id: '4', type: 'If-Then',    front: 'If you check your phone or email in the first hour of work', back: 'Then you have handed your agenda to other people\'s priorities. The first hour sets the depth of the day. Protect it as if it\'s the most valuable asset you have — because it is.' },
+      { id: '5', type: 'Framework',  front: 'The 4DX framework applied to deep work', back: '1) Focus on the wildly important. 2) Act on lead measures (hours of deep work), not lag measures (results). 3) Keep a scoreboard. 4) Create a cadence of accountability. Measure depth, not activity.' },
+      { id: '6', type: 'Principle',  front: 'Boredom tolerance is a trainable skill', back: 'If you seek distraction whenever boredom appears, your brain learns it cannot concentrate. Practice sitting with boredom daily — waiting in line, walking without your phone — to build the neural capacity for depth.' },
+      { id: '7', type: 'If-Then',    front: 'If a task can be done adequately by someone else or a tool', back: 'Then it is shallow work and should be batched, delegated, or eliminated. Your hours of peak cognitive energy should never be spent on shallow work regardless of how urgent it feels.' },
+      { id: '8', type: 'Framework',  front: 'The Shutdown Ritual — why it matters', back: 'End each workday with a ritual: review incomplete tasks, set tomorrow\'s plan, say "shutdown complete." This signals to the brain that work is done, reducing evening rumination and improving recovery.' },
+      { id: '9', type: 'Question',   front: 'How many hours of genuine deep work did I do today?', back: 'Track this number daily. Most knowledge workers do less than 1 hour of true deep work per day. 4 hours of uninterrupted depth is elite. The number exposes the truth about how you actually spend your capacity.' },
+      { id: '10', type: 'Principle', front: 'Craftsman mindset beats passion mindset', back: 'Don\'t follow your passion — develop rare and valuable skills, and passion will follow. The craftsman focuses relentlessly on the quality of their output, which builds both mastery and meaning over time.' },
+    ]
+  },
+  {
+    id: 'principles', title: 'Principles', author: 'Ray Dalio', topic: 'Business', emoji: '⚖️',
+    cards: [
+      { id: '1', type: 'Principle',  front: 'Pain + Reflection = Progress', back: 'Every mistake and setback contains a lesson. The formula is not avoiding pain but processing it deliberately. Without reflection, pain is just suffering. With it, pain is the primary engine of growth.' },
+      { id: '2', type: 'Framework',  front: 'The 5-Step Process to get what you want', back: '1) Set clear goals. 2) Identify the problems blocking you. 3) Diagnose the root causes. 4) Design solutions. 5) Execute. Most people skip diagnosis and design solutions for symptoms, not causes.' },
+      { id: '3', type: 'Principle',  front: 'Radical open-mindedness is not the same as being agreeable', back: 'True open-mindedness means genuinely considering that you are wrong, especially when it is uncomfortable. It requires intellectual curiosity to outweigh ego. Most people mistake politeness for open-mindedness.' },
+      { id: '4', type: 'If-Then',    front: 'If you disagree with a decision that has been made', back: 'Then you have an obligation to speak up in the moment — not after. Silent disagreement followed by non-commitment is the most destructive pattern in organisations and trading partnerships.' },
+      { id: '5', type: 'Framework',  front: 'Believability-weighted decision making', back: 'Not all opinions are equal. Weight input based on track record in the relevant domain. Seek out people with proven expertise who disagree with you. Average opinions produce average outcomes.' },
+      { id: '6', type: 'Principle',  front: 'You are not your mistakes — you are how you respond to them', back: 'The most successful people Dalio has observed treat failure as data, not identity. They distinguish between the machine (their system) and themselves as the designer of the machine.' },
+      { id: '7', type: 'Question',   front: 'Is my ego protecting me from accurate information right now?', back: 'The ego interprets criticism as attack and deflects feedback. Ask yourself if you are defending a position or genuinely evaluating it. The two feel identical from the inside — which is why this question matters.' },
+      { id: '8', type: 'Framework',  front: 'The Two Yous: higher-level you vs. lower-level you', back: 'Higher-level you observes, evaluates, designs. Lower-level you reacts emotionally and seeks comfort. The job of the higher-level you is to manage the lower-level you with the same objectivity you\'d apply to others.' },
+      { id: '9', type: 'Principle',  front: 'Systemise everything worth repeating', back: 'When you make a good decision, write the principle behind it. When you make a bad one, write what you\'ll do differently next time. Over time, your principle set becomes a decision-making machine.' },
+      { id: '10', type: 'If-Then',   front: 'If a problem recurs more than twice', back: 'Then it is a systems failure, not a personal one. Stop blaming people and redesign the system. Recurring problems are never solved by trying harder — they are solved by changing what produces them.' },
+    ]
+  },
+  {
+    id: '48laws', title: 'The 48 Laws of Power', author: 'Robert Greene', topic: 'Business', emoji: '♟️',
+    cards: [
+      { id: '1', type: 'Principle',  front: 'Never outshine the master (Law 1)', back: 'Make those above you feel superior. Their insecurity is a threat to your position. Let them have the spotlight. Your time to shine comes when you are the master. Patience here is a form of power.' },
+      { id: '2', type: 'Principle',  front: 'Never put too much trust in friends — use enemies (Law 2)', back: 'Friends become envious. Former enemies, once converted, are more loyal because they have more to prove. Keep friends emotionally at arm\'s length while maintaining useful allies strategically.' },
+      { id: '3', type: 'Framework',  front: 'The 3 categories of people in any power structure', back: 'Allies (useful now), Opponents (useful to convert or neutralise), Naïve (will be exploited by others). Correctly categorising people protects you from misplacing trust and missing strategic moves.' },
+      { id: '4', type: 'Principle',  front: 'Always say less than necessary (Law 4)', back: 'Power is accumulated in silence and lost in chatter. Every word you speak gives others information about your thinking. Cultivate an air of mystery. Let others fill the silence — they always reveal more than you.' },
+      { id: '5', type: 'If-Then',    front: 'If someone attacks you emotionally or publicly', back: 'Then do not react immediately. Reaction is what they want — it signals that they have power over you. Pause. A measured or surprising response is always more powerful than an emotional one.' },
+      { id: '6', type: 'Principle',  front: 'Reputation is the cornerstone of power (Law 5)', back: 'Guard it with your life. A strong reputation creates a force field — opponents hesitate, opportunities arrive. A damaged reputation is almost impossible to restore. Make maintaining it a daily discipline.' },
+      { id: '7', type: 'Framework',  front: 'The 4 types of power moves', back: 'Coercion (force), Seduction (desire), Manipulation (misdirection), Persuasion (logic + emotion). The most durable power uses persuasion and seduction. Coercion creates enemies. Manipulation, when exposed, is fatal.' },
+      { id: '8', type: 'If-Then',    front: 'If you are new to a group or organisation', back: 'Then observe for longer than feels comfortable before acting. The power structures, alliances, and unspoken rules are invisible at first. Acting too early based on surface information is one of the most common costly mistakes.' },
+      { id: '9', type: 'Principle',  front: 'Concentrate your forces (Law 23)', back: 'Intensity beats extensity. One skill developed to mastery produces more power than ten skills developed to adequacy. One strong alliance is worth ten weak ones. Focus is a power strategy, not just a productivity one.' },
+      { id: '10', type: 'Question',  front: 'Who benefits from this situation — and is it actually me?', back: 'Greene\'s core lesson: always trace the real beneficiary of any situation. When you can\'t see who benefits, you are probably the one being used. Power requires seeing the game clearly before playing it.' },
+    ]
+  },
+  {
+    id: 'neversplit', title: 'Never Split the Difference', author: 'Chris Voss', topic: 'Business', emoji: '🤝',
+    cards: [
+      { id: '1', type: 'Principle',  front: 'Negotiation is not a rational exercise — it\'s emotional', back: 'People make decisions based on feeling, then justify with logic. The FBI hostage negotiator who wins isn\'t the smartest — it\'s the one who best understands and manages the other party\'s emotional state.' },
+      { id: '2', type: 'Framework',  front: 'Tactical Empathy: the core skill', back: 'Understand and verbalise the other person\'s perspective and feelings — not to agree, but to demonstrate that you see their world. This disarms defensiveness and builds trust without conceding anything.' },
+      { id: '3', type: 'If-Then',    front: 'If the other person seems defensive or closed off', back: 'Then label their emotion: "It seems like you\'re frustrated." Labelling de-escalates. It makes people feel heard, which reduces the emotional charge that is blocking rational conversation.' },
+      { id: '4', type: 'Framework',  front: 'The Mirroring technique', back: 'Repeat the last 1–3 words the other person said, with a slight upward inflection. They will elaborate, often revealing information you need. It requires no cleverness — just silence and repetition.' },
+      { id: '5', type: 'Principle',  front: '"No" is not failure — it\'s the beginning of negotiation', back: '"Yes" is often false (commitment they don\'t mean). "No" is real. It means they feel safe enough to be honest. Get to "No" early and work from there. Protect their right to say no.' },
+      { id: '6', type: 'Framework',  front: 'Calibrated questions that create motion without pressure', back: 'Use "How" and "What" questions: "How am I supposed to do that?" / "What does success look like for you?" These force the other party to solve your problem and reveal their constraints without confrontation.' },
+      { id: '7', type: 'If-Then',    front: 'If you need to make a concession', back: 'Then make it non-round and decreasing. Offer 185, then 192, then 194. Round numbers signal that more is available. Decreasing increments signal you are approaching your limit. Never split the difference — it rewards bad-faith anchoring.' },
+      { id: '8', type: 'Principle',  front: 'The late-night FM DJ voice creates compliance', back: 'A calm, slow, low-pitched voice with a downward inflection signals authority and certainty without aggression. It bypasses the fight-or-flight response. Practise it in any high-stakes conversation.' },
+      { id: '9', type: 'Framework',  front: 'The Accusation Audit — preempt their objections', back: 'List every negative thing the other party could think about you or your offer, then say them out loud first. "You probably think this is a terrible deal..." This disarms the power of those objections before they\'re raised.' },
+      { id: '10', type: 'Question',  front: 'What does this person need to feel to say yes?', back: 'Not what do they need to know — what do they need to feel? Safety? Respected? Like they won? Design your approach around the emotional outcome, not the logical argument. Logic follows emotion in every deal.' },
+    ]
+  },
 ]
 
 const CARD_TYPE_STYLES = {
@@ -1287,62 +1427,19 @@ function LearnHistory({ learnings, onEdit, onDelete, onReview, onCancelReview })
 // ─── Book Extract Modal ───────────────────────────────────────────────────────
 
 function BookExtractModal({ onClose, onSave, existingExtracts }) {
-  const [step,        setStep]        = useState('pick') // pick | generating | review | saving
+  const [step,         setStep]        = useState('pick') // pick | review
   const [selectedBook, setSelectedBook] = useState(null)
-  const [cards,       setCards]       = useState([])
-  const [error,       setError]       = useState(null)
-  const [editingCard, setEditingCard] = useState(null) // index of card being edited
-  const [editFront,   setEditFront]   = useState('')
-  const [editBack,    setEditBack]    = useState('')
+  const [cards,        setCards]       = useState([])
+  const [editingCard,  setEditingCard] = useState(null)
+  const [editFront,    setEditFront]   = useState('')
+  const [editBack,     setEditBack]    = useState('')
 
   const extractedIds = new Set((existingExtracts || []).map(e => e.bookTitle))
 
-  async function generateExtract(book) {
+  function loadBook(book) {
     setSelectedBook(book)
-    setStep('generating')
-    setError(null)
-    try {
-      const prompt = `You are extracting the most actionable, practical ideas from "${book.title}" by ${book.author} for a spaced repetition flashcard system.
-
-Generate exactly 10 flashcard-style ideas from this book. Each idea must be one of these types:
-- Principle: A core belief or truth that drives behaviour
-- Framework: A named model or system with clear steps/structure
-- If-Then: A specific trigger→action rule ("If X happens, then do Y")
-- Question: A powerful question that reframes thinking
-
-Rules:
-- Be specific and actionable — no fluff or summaries
-- Each card: a short FRONT (the prompt, max 15 words) and BACK (the answer/explanation, max 40 words)
-- Mix types intelligently based on what the book offers
-- Focus on what's immediately useful for a 29-year-old trader and ESL teacher in Vietnam
-
-Respond ONLY with a valid JSON array, no markdown, no explanation:
-[
-  {"id":"1","type":"Principle","front":"...","back":"..."},
-  {"id":"2","type":"If-Then","front":"...","back":"..."},
-  ...
-]`
-
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: prompt }],
-        }),
-      })
-      const data = await response.json()
-      const raw  = data.content?.find(b => b.type === 'text')?.text || ''
-      const clean = raw.replace(/```json|```/g, '').trim()
-      const parsed = JSON.parse(clean)
-      if (!Array.isArray(parsed) || parsed.length < 5) throw new Error('Invalid response')
-      setCards(parsed)
-      setStep('review')
-    } catch (e) {
-      setError('Extraction failed. Check your connection and try again.')
-      setStep('pick')
-    }
+    setCards(book.cards.map(c => ({ ...c })))
+    setStep('review')
   }
 
   function startEdit(idx) {
@@ -1377,7 +1474,7 @@ Respond ONLY with a valid JSON array, no markdown, no explanation:
           <div>
             <div className="modal-title" style={{ margin: 0 }}>📖 Extract a Book</div>
             <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 3 }}>
-              Claude reads it. You drill it. 80% score weight vs a full read.
+              10 pre-extracted cards per book. Review, edit, then drill with spaced repetition.
             </div>
           </div>
           <button className="btn btn-sm" onClick={onClose}>✕</button>
@@ -1386,13 +1483,8 @@ Respond ONLY with a valid JSON array, no markdown, no explanation:
         {/* Step: Pick */}
         {step === 'pick' && (
           <div style={{ overflowY: 'auto', flex: 1 }}>
-            {error && (
-              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', fontSize: 13, color: '#ef4444', marginBottom: 16 }}>
-                {error}
-              </div>
-            )}
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text2)', marginBottom: 10 }}>
-              Your library — select a book to extract
+              Your library — select a book to load
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {BOOK_LIBRARY.map(book => {
@@ -1400,7 +1492,7 @@ Respond ONLY with a valid JSON array, no markdown, no explanation:
                 return (
                   <div
                     key={book.id}
-                    onClick={() => !done && generateExtract(book)}
+                    onClick={() => !done && loadBook(book)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 12,
                       padding: '12px 14px', borderRadius: 10, cursor: done ? 'default' : 'pointer',
@@ -1415,28 +1507,16 @@ Respond ONLY with a valid JSON array, no markdown, no explanation:
                     <span style={{ fontSize: 24 }}>{book.emoji}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{book.title}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text3)' }}>{book.author} · {book.topic}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text3)' }}>{book.author} · {book.topic} · {book.cards.length} cards ready</div>
                     </div>
                     {done ? (
-                      <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>✓ Extracted</span>
+                      <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>✓ Added</span>
                     ) : (
-                      <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>Extract →</span>
+                      <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>Load →</span>
                     )}
                   </div>
                 )
               })}
-            </div>
-          </div>
-        )}
-
-        {/* Step: Generating */}
-        {step === 'generating' && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px', textAlign: 'center' }}>
-            <div style={{ fontSize: 48, marginBottom: 16, animation: 'spin 2s linear infinite' }}>📖</div>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Extracting {selectedBook?.title}...</div>
-            <div style={{ fontSize: 13, color: 'var(--text3)', lineHeight: 1.6 }}>
-              Claude is distilling the 10 most actionable ideas into flashcards.<br />
-              This takes about 10 seconds.
             </div>
           </div>
         )}
@@ -1447,7 +1527,7 @@ Respond ONLY with a valid JSON array, no markdown, no explanation:
             <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(124,106,255,0.08)', border: '1px solid rgba(124,106,255,0.2)', marginBottom: 14, flexShrink: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 14 }}>{selectedBook?.emoji} {selectedBook?.title}</div>
               <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
-                {cards.length} cards extracted · Review and edit before saving · Cards are reviewed individually over 2 weeks
+                {cards.length} cards ready · Edit or remove any before saving · Each card gets its own spaced repetition schedule
               </div>
             </div>
 
@@ -1503,7 +1583,7 @@ Respond ONLY with a valid JSON array, no markdown, no explanation:
             </div>
 
             <div className="modal-footer" style={{ flexShrink: 0, marginTop: 12 }}>
-              <button className="btn" onClick={() => { setStep('pick'); setCards([]) }}>← Re-pick book</button>
+              <button className="btn" onClick={() => { setStep('pick'); setCards([]) }}>← Back to library</button>
               <button
                 className="btn btn-primary"
                 onClick={handleSave}
