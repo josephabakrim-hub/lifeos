@@ -228,28 +228,43 @@ export function useLearn() {
     // Book extract entries added this week
     const extractItems = weekItems.filter(l => l.type === 'book_extract')
 
-    if (!weekItems.length && !allWeekReviews.length) return 0
+    if (!regularItems.length && !allWeekReviews.length && !extractItems.length) return 0
 
     const hoursLogged = regularItems.reduce((acc, l) => acc + (l.duration || 0), 0)
-    // Each book extract counts as 1.5h equivalent at 80% weight
-    const extractHours = extractItems.length * 1.5 * BOOK_EXTRACT_WEIGHT
-    const totalHours   = hoursLogged + extractHours
+
+    // Extract hours only credit when you also did real learning sessions this week.
+    // Without that gate, simply adding a book extract inflates the score artificially.
+    const extractHours = regularItems.length > 0
+      ? extractItems.length * 1.5 * BOOK_EXTRACT_WEIGHT
+      : 0
+    const totalHours = hoursLogged + extractHours
 
     const notesCount  = regularItems.filter(l => l.takeaways?.length > 0).length
     const applied     = regularItems.filter(l => l.applied).length
 
-    const reviewsDoneThisWeek = allWeekReviews.length
-    const avgRecall = reviewsDoneThisWeek > 0
-      ? allWeekReviews.reduce((s, r) => s + r.recallRating, 0) / reviewsDoneThisWeek
+    const sessionReviewCount = weekReviews.length
+    const cardReviewCount    = weekCardReviews.length
+    const avgRecall = allWeekReviews.length > 0
+      ? allWeekReviews.reduce((s, r) => s + r.recallRating, 0) / allWeekReviews.length
       : 0
+
+    // Session reviews: target 3/week → up to 20 pts of the 30pt review weight
+    const sessionReviewScore = sessionReviewCount === 0
+      ? 0
+      : Math.min(20, (sessionReviewCount / 3) * 20) * (avgRecall >= 3 ? 1 : 0.5)
+
+    // Card reviews: target 10/week (full book) → up to 10 pts of the 30pt review weight
+    // Capped so cards alone can never saturate the review component
+    const cardReviewScore = cardReviewCount === 0
+      ? 0
+      : Math.min(10, (cardReviewCount / 10) * 10) * (avgRecall >= 3 ? 1 : 0.5)
+
+    // Combined review score out of 100 (will be weighted at 0.30 below)
+    const reviewScore = Math.min(100, (sessionReviewScore + cardReviewScore) / 0.30)
 
     const hoursScore   = Math.min(100, (totalHours / 7) * 100)
     const notesScore   = Math.min(100, (notesCount / 7) * 100)
     const appliedScore = applied > 0 ? 100 : 0
-
-    const reviewScore = reviewsDoneThisWeek === 0
-      ? 0
-      : Math.min(100, (reviewsDoneThisWeek / 3) * 100) * (avgRecall >= 3 ? 1 : 0.5)
 
     return Math.round(
       hoursScore   * 0.35 +
