@@ -293,27 +293,50 @@ function WeeklyCalendar({ plans, allPlans, savePlanForWeek, deletePlan }) {
 // ─── Milestone picker modal ───────────────────────────────────────────────────
 
 function MilestonePickerModal({ goals, onSelect, onClose }) {
-  const milestones = []
-  goals.filter(g => g.status === 'active').forEach(goal => {
-    ;(goal.milestones || []).forEach(m => {
-      if (!m.done) milestones.push({ goalTitle: goal.title, text: m.text })
-    })
-  })
+  const activeGoals = goals.filter(g => g.status === 'active').map(goal => ({
+    ...goal,
+    pendingMilestones: (goal.milestones || []).filter(m => !m.done),
+  })).filter(g => g.pendingMilestones.length > 0)
+
+  const totalMilestones = activeGoals.reduce((acc, g) => acc + g.pendingMilestones.length, 0)
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
         <div className="modal-title">🎯 Link a milestone as your weekly goal</div>
-        {milestones.length === 0 ? (
+        {totalMilestones === 0 ? (
           <div style={{ fontSize: 13, color: 'var(--text3)', textAlign: 'center', padding: '24px 0' }}>
             No pending milestones found.<br />Add milestones in your Goals section first.
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {milestones.map((m, i) => (
-              <div key={i} onClick={() => { onSelect(m.text); onClose() }} style={{ padding: '10px 14px', borderRadius: 8, cursor: 'pointer', background: 'var(--bg3)', border: '1px solid var(--border2)', transition: 'border-color 0.15s' }} onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'} onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border2)'}>
-                <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 3 }}>🎯 {m.goalTitle}</div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{m.text}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxHeight: 420, overflowY: 'auto' }}>
+            {activeGoals.map(goal => (
+              <div key={goal.id}>
+                {/* Goal header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent2)', whiteSpace: 'nowrap', padding: '0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    🎯 {goal.title}
+                  </span>
+                  <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                </div>
+                {/* Milestones under this goal */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {goal.pendingMilestones.map((m, i) => (
+                    <div
+                      key={i}
+                      onClick={() => { onSelect(m.text); onClose() }}
+                      style={{ padding: '10px 14px', borderRadius: 8, cursor: 'pointer', background: 'var(--bg3)', border: '1px solid var(--border2)', transition: 'border-color 0.15s' }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border2)'}
+                    >
+                      <div style={{ fontSize: 14, fontWeight: 600 }}>{m.text}</div>
+                      {m.dueDate && (
+                        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>Due {m.dueDate}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
