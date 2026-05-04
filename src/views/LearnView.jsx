@@ -1459,7 +1459,7 @@ function BookExtractModal({ onClose, onSave, existingExtracts }) {
 
   function handleSave() {
     if (!selectedBook || cards.length < 3) return
-    onSave({ ...selectedBook, cards })
+    onSave({ bookTitle: selectedBook.title, author: selectedBook.author, topic: selectedBook.topic, cards })
     onClose()
   }
 
@@ -1758,7 +1758,7 @@ function BooksTab({ extracts, dueCards, onAddExtract, onCardReview, onPostponeCa
         <div className="empty-state">
           <div className="empty-state-icon">📖</div>
           <h3>No book extracts yet</h3>
-          <p>Extract a book from the library above. Claude distils the 10 most actionable ideas into flashcards you drill over 2 weeks.</p>
+          <p>Pick a book from the library. 10 pre-extracted cards load instantly — review, edit, then drill with spaced repetition over 2 weeks.</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
