@@ -55,6 +55,24 @@ function calcStreak(oneThing = []) {
   return streak
 }
 
+function calcLastActivity(goal) {
+  // Returns ISO date string of most recent task completion or milestone toggle
+  const events = []
+  ;(goal.milestones || []).forEach(m => {
+    if (m.completedAt) events.push(m.completedAt)
+    ;(m.tasks || []).forEach(t => { if (t.completedAt) events.push(t.completedAt) })
+  })
+  if (!events.length) return null
+  return events.sort().reverse()[0].slice(0, 10)
+}
+
+function daysSince(dateStr) {
+  if (!dateStr) return null
+  const today = new Date(); today.setHours(0,0,0,0)
+  const d = new Date(dateStr); d.setHours(0,0,0,0)
+  return Math.round((today - d) / 86400000)
+}
+
 function deadlineLabel(days) {
   if (days === null) return null
   if (days < 0)  return { text: `${Math.abs(days)}d overdue`, color: '#ef4444', pulse: true }
@@ -64,6 +82,33 @@ function deadlineLabel(days) {
   if (days <= 14) return { text: `${days}d left`, color: '#f59e0b', pulse: false }
   if (days <= 30) return { text: `${days}d left`, color: '#22c55e', pulse: false }
   return { text: `${days}d left`, color: '#3b82f6', pulse: false }
+}
+
+// ─── 12WY sprint badge helper ────────────────────────────────────────────────
+
+function get12WYQuarterLabel() {
+  // Reads localStorage (same key as WeeklyView)
+  const qs = localStorage.getItem('lo_12wy_quarterStart')
+  if (!qs) return null
+  const start = new Date(qs + 'T00:00:00')
+  const end   = new Date(start); end.setDate(end.getDate() + 83)
+  const today = new Date(); today.setHours(0,0,0,0)
+  const diffDays  = Math.floor((today - start) / 86400000)
+  if (diffDays < 0 || diffDays > 84) return null
+  const weekNum = Math.floor(diffDays / 7) + 1
+  return { weekNum, endStr: end.toISOString().split('T')[0] }
+}
+
+function sprintBadge(targetDate) {
+  const info = get12WYQuarterLabel()
+  if (!info || !targetDate) return null
+  const fits = targetDate <= info.endStr
+  return {
+    text: fits ? `Q2 W${info.weekNum}` : 'Beyond Q2',
+    color: fits ? '#7c6aff' : '#9898b0',
+    bg:    fits ? 'rgba(124,106,255,0.1)' : 'rgba(152,152,176,0.08)',
+    fits,
+  }
 }
 
 // ─── Focus Mode (top bar) ─────────────────────────────────────────────────────
@@ -689,6 +734,9 @@ function GoalCard({
   const hasWOOP        = !!goal.woop?.wish
   const [showOneThingLog, setShowOneThingLog] = useState(false)
 
+  const lastActivity   = calcLastActivity(goal)
+  const stagnationDays = lastActivity ? daysSince(lastActivity) : (goal.createdAt ? daysSince(goal.createdAt.slice(0,10)) : null)
+
   // Determine status label
   const statusLabel = (isOverdue && progress < 100) ? { text: 'Overdue', color: '#ef4444', bg: 'rgba(239,68,68,0.1)' }
     : progress >= 75 ? { text: 'On track', color: '#22c55e', bg: 'rgba(34,197,94,0.1)' }
@@ -758,6 +806,20 @@ function GoalCard({
               )}
               {hasWOOP && (
                 <span style={{ fontSize: 10, color: '#9f91ff', padding: '2px 8px', borderRadius: 20, background: 'rgba(159,145,255,0.08)' }}>🔮 WOOP</span>
+              )}
+              {(() => {
+                const badge = sprintBadge(goal.targetDate)
+                if (!badge) return null
+                return (
+                  <span style={{ fontSize: 10, fontWeight: 700, color: badge.color, padding: '2px 8px', borderRadius: 20, background: badge.bg }}>
+                    📆 {badge.text}
+                  </span>
+                )
+              })()}
+              {stagnationDays !== null && stagnationDays >= 7 && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', padding: '2px 8px', borderRadius: 20, background: 'rgba(245,158,11,0.1)', animation: 'pulse 2s infinite' }}>
+                  ⚠️ {stagnationDays}d no activity
+                </span>
               )}
             </div>
 
@@ -834,12 +896,23 @@ function GoalCard({
             </div>
           )}
 
-          {/* Week commit */}
-          {thisWeekCommit && (
-            <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(124,106,255,0.07)', border: '1px solid rgba(124,106,255,0.2)', fontSize: 12, color: '#7c6aff', lineHeight: 1.5 }}>
-              📅 <strong>This week:</strong> {thisWeekCommit.text}
+          {/* Weekly bridge */}
+          <div style={{ marginBottom: 12, marginTop: 4, padding: '10px 14px', borderRadius: 10, background: thisWeekCommit ? 'rgba(124,106,255,0.07)' : 'rgba(245,158,11,0.05)', border: `1px solid ${thisWeekCommit ? 'rgba(124,106,255,0.25)' : 'rgba(245,158,11,0.2)'}`, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>{thisWeekCommit ? '📅' : '⚡'}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {thisWeekCommit ? (
+                <>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#7c6aff', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.4 }}>In Weekly this week</div>
+                  <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5 }}>{thisWeekCommit.text}</div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.4 }}>Not in your Weekly plan yet</div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>Go to Weekly → link a milestone from this goal to make it real this week.</div>
+                </>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Deadline timeline */}
           {goal.targetDate && (() => {
@@ -954,6 +1027,16 @@ function GoalCard({
                   }
                 }}
               >✓ Complete</button>
+              <button
+                className="btn btn-sm"
+                style={{ background: 'rgba(99,102,241,0.07)', borderColor: 'rgba(99,102,241,0.3)', color: '#818cf8', fontSize: 11 }}
+                title="Park this goal for later — activate it when the time is right"
+                onClick={() => {
+                  if (window.confirm(`Archive "${goal.title}"? It will move to Parked Goals. You can activate it any time.`)) {
+                    updateGoal(goal.id, { status: 'archived', archivedAt: new Date().toISOString() })
+                  }
+                }}
+              >📦 Archive</button>
               <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => onEdit(goal)}>✏️ Edit</button>
               <button
                 className="btn btn-sm btn-danger"
@@ -1107,82 +1190,69 @@ function OneThingModal({ goal, onClose, onSave }) {
   )
 }
 
-// ─── Completed Goals History ──────────────────────────────────────────────────
+// ─── Reusable collapsed goal shelf (used for Completed + Archived) ───────────
 
-function CompletedGoalsHistory({ completedGoals, onRestore, onDelete }) {
+function GoalShelf({ title, icon, accentColor, accentBg, goals, primaryAction, primaryLabel, secondaryAction, secondaryLabel, dateKey, datePrefix, showProgress }) {
   const [isOpen, setIsOpen] = useState(false)
+  if (!goals.length) return null
 
   return (
-    <div style={{ marginTop: 28 }}>
+    <div style={{ marginTop: 20 }}>
       <button
         onClick={() => setIsOpen(p => !p)}
         style={{
           display: 'flex', alignItems: 'center', gap: 8, width: '100%',
           padding: '12px 16px', borderRadius: 10,
           background: 'var(--bg2)', border: '1px solid var(--border)',
-          cursor: 'pointer', color: 'var(--text2)',
-          transition: 'all 0.15s',
+          cursor: 'pointer', color: 'var(--text2)', transition: 'all 0.15s',
         }}
       >
-        <span style={{ fontSize: 16 }}>🏆</span>
-        <span style={{ fontSize: 13, fontWeight: 700 }}>Completed Goals</span>
-        <span style={{
-          fontSize: 12, color: 'var(--text3)',
-          padding: '1px 8px', borderRadius: 20,
-          background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)',
-          color: '#22c55e', fontWeight: 700,
-        }}>{completedGoals.length}</span>
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text3)', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'none', display: 'inline-block' }}>▼</span>
+        <span style={{ fontSize: 16 }}>{icon}</span>
+        <span style={{ fontSize: 13, fontWeight: 700 }}>{title}</span>
+        <span style={{ fontSize: 12, padding: '1px 8px', borderRadius: 20, background: accentBg, color: accentColor, fontWeight: 700, border: `1px solid ${accentColor}40` }}>
+          {goals.length}
+        </span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text3)', transition: 'transform 0.2s', display: 'inline-block', transform: isOpen ? 'rotate(180deg)' : 'none' }}>▼</span>
       </button>
 
       {isOpen && (
         <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {completedGoals.map(goal => {
+          {goals.map(goal => {
             const color = CATEGORY_COLORS[goal.category] || '#22c55e'
-            const icon  = CATEGORY_ICONS[goal.category]  || '🎯'
+            const icon_ = CATEGORY_ICONS[goal.category]  || '🎯'
+            const dateVal = goal[dateKey]
             return (
               <div key={goal.id} style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '12px 16px', borderRadius: 10,
                 background: 'var(--bg2)', border: '1px solid var(--border)',
               }}>
-                {/* icon */}
-                <span style={{ fontSize: 18, opacity: 0.6 }}>{icon}</span>
-
-                {/* info */}
+                <span style={{ fontSize: 18, opacity: 0.6 }}>{icon_}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', textDecoration: 'line-through', opacity: 0.7 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', opacity: 0.8 }}>
                     {goal.title}
                   </div>
-                  <div style={{ display: 'flex', gap: 10, marginTop: 3, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11, color, padding: '1px 7px', borderRadius: 20, background: color + '15' }}>
-                      {goal.category}
-                    </span>
-                    {goal.completedAt && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color, padding: '1px 7px', borderRadius: 20, background: color + '15' }}>{goal.category}</span>
+                    {dateVal && (
                       <span style={{ fontSize: 11, color: 'var(--text3)' }}>
-                        ✓ {new Date(goal.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {datePrefix} {new Date(dateVal).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </span>
                     )}
-                    {goal.progress !== undefined && (
-                      <span style={{ fontSize: 11, color: '#22c55e' }}>{goal.progress}% done</span>
+                    {showProgress && goal.progress !== undefined && (
+                      <span style={{ fontSize: 11, color: accentColor, fontWeight: 600 }}>{goal.progress}% done</span>
                     )}
                   </div>
                 </div>
-
-                {/* actions */}
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   <button
                     className="btn btn-sm"
-                    style={{ fontSize: 11, color: '#22c55e', borderColor: 'rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.07)' }}
-                    onClick={() => onRestore(goal.id)}
-                    title="Move back to active goals"
-                  >↩ Restore</button>
-                  <button
-                    className="btn btn-sm btn-danger"
-                    style={{ fontSize: 11 }}
-                    onClick={() => onDelete(goal.id, goal.title)}
-                    title="Permanently delete"
-                  >✕</button>
+                    style={{ fontSize: 11, color: accentColor, borderColor: accentColor + '50', background: accentBg }}
+                    onClick={() => primaryAction(goal.id)}
+                  >{primaryLabel}</button>
+                  {secondaryAction && (
+                    <button className="btn btn-sm btn-danger" style={{ fontSize: 11 }} onClick={() => secondaryAction(goal.id, goal.title)}>✕</button>
+                  )}
                 </div>
               </div>
             )
@@ -1215,9 +1285,11 @@ export default function GoalsView({
   const [showFocusMode,     setShowFocusMode]     = useState(false)
   const [categoryFilter,    setCategoryFilter]    = useState('All')
 
-  const weekScore   = getWeekScore()
-  const activeGoals = goals.filter(g => g.status === 'active')
-  const nextActions = getNextActions ? getNextActions() : []
+  const weekScore    = getWeekScore()
+  const activeGoals  = goals.filter(g => g.status === 'active')
+  const completedGoals = goals.filter(g => g.status === 'completed')
+  const archivedGoals  = goals.filter(g => g.status === 'archived')
+  const nextActions  = getNextActions ? getNextActions() : []
 
   // Wire up ONE Thing modal via the card (avoids prop drilling)
   window._oneThingGoal = (goal) => { setOneThingGoal(goal); setShowOneThingModal(true) }
@@ -1293,7 +1365,7 @@ export default function GoalsView({
             )}
           </button>
 
-          {isTodayMonday() && activeGoals.length > 0 && (
+          {activeGoals.length > 0 && (
             <button
               onClick={() => setShowWeeklyModal(true)}
               style={{ padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(124,106,255,0.4)', background: 'rgba(124,106,255,0.1)', color: '#7c6aff' }}
@@ -1316,6 +1388,7 @@ export default function GoalsView({
             { label: 'Avg progress',  value: Math.round(activeGoals.reduce((a,g) => a+(g.progress||0),0)/activeGoals.length)+'%', color: scoreColor(Math.round(activeGoals.reduce((a,g)=>a+(g.progress||0),0)/activeGoals.length)), sub: 'across all goals' },
             { label: 'WOOP complete', value: activeGoals.filter(g=>g.woop?.wish).length+'/'+activeGoals.length, color: '#a855f7', sub: 'anti-quit plans' },
             { label: 'Total tasks',   value: (() => { const all=activeGoals.flatMap(g=>(g.milestones||[]).flatMap(m=>m.tasks||[])); return `${all.filter(t=>t.done).length}/${all.length}` })(), color: '#22c55e', sub: 'tasks done' },
+            { label: 'Parked',         value: archivedGoals.length,                          color: '#818cf8', sub: 'activate when ready' },
           ].map(s => (
             <div key={s.label} style={{ padding: '16px 14px', borderRadius: 10, background: 'var(--bg2)', border: '1px solid var(--border)', flex: 1, minWidth: 100, textAlign: 'center' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 800, color: s.color, lineHeight: 1.1 }}>{s.value}</div>
@@ -1336,15 +1409,25 @@ export default function GoalsView({
       )}
 
       {/* ── Banners ── */}
-      {isTodayMonday() && activeGoals.length > 0 && (
-        <div style={{ padding: '12px 16px', marginBottom: 14, borderRadius: 10, background: 'rgba(124,106,255,0.07)', border: '1px solid rgba(124,106,255,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#7c6aff' }}>📅 It's Monday — time to commit</div>
-            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>What will you move forward on each goal this week?</div>
+      {(() => {
+        const today = new Date()
+        const dayOfWeek = today.getDay()
+        const isMonday = dayOfWeek === 1
+        const todayStr = today.toISOString().split('T')[0]
+        const noneCommitted = activeGoals.length > 0 && activeGoals.every(g => !g.weeklyCommitments?.find(w => w.week === todayStr || w.week >= todayStr.slice(0,8) + '01'))
+        if (!isMonday && !noneCommitted) return null
+        return (
+          <div style={{ padding: '12px 16px', marginBottom: 14, borderRadius: 10, background: 'rgba(124,106,255,0.07)', border: '1px solid rgba(124,106,255,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#7c6aff' }}>
+                {isMonday ? '📅 It's Monday — time to commit' : '📅 No weekly commitments set yet'}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>What will you move forward on each goal this week?</div>
+            </div>
+            <button className="btn btn-sm" style={{ background: '#7c6aff', color: '#fff', borderColor: '#7c6aff' }} onClick={() => setShowWeeklyModal(true)}>Set commitments →</button>
           </div>
-          <button className="btn btn-sm" style={{ background: '#7c6aff', color: '#fff', borderColor: '#7c6aff' }} onClick={() => setShowWeeklyModal(true)}>Set commitments →</button>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Overdue banner */}
       {(() => {
@@ -1415,16 +1498,35 @@ export default function GoalsView({
         </div>
       )}
 
-      {/* ── Completed goals history ── */}
-      {goals.filter(g => g.status !== 'active').length > 0 && (
-        <CompletedGoalsHistory
-          completedGoals={goals.filter(g => g.status !== 'active')}
-          onRestore={(id) => updateGoal(id, { status: 'active', completedAt: null })}
-          onDelete={(id, title) => {
-            if (window.confirm(`Permanently delete "${title}"? This cannot be undone.`)) deleteGoal(id)
-          }}
-        />
-      )}
+      {/* ── Archived (parked) goals ── */}
+      <GoalShelf
+        title="Parked Goals"
+        icon="📦"
+        accentColor="#818cf8"
+        accentBg="rgba(129,140,248,0.08)"
+        goals={archivedGoals}
+        primaryAction={(id) => updateGoal(id, { status: 'active', archivedAt: null })}
+        primaryLabel="▶ Activate"
+        secondaryAction={(id, title) => { if (window.confirm(`Permanently delete "${title}"? This cannot be undone.`)) deleteGoal(id) }}
+        dateKey="archivedAt"
+        datePrefix="Parked"
+        showProgress={true}
+      />
+
+      {/* ── Completed goals ── */}
+      <GoalShelf
+        title="Completed Goals"
+        icon="🏆"
+        accentColor="#22c55e"
+        accentBg="rgba(34,197,94,0.08)"
+        goals={completedGoals}
+        primaryAction={(id) => updateGoal(id, { status: 'active', completedAt: null })}
+        primaryLabel="↩ Restore"
+        secondaryAction={(id, title) => { if (window.confirm(`Permanently delete "${title}"? This cannot be undone.`)) deleteGoal(id) }}
+        dateKey="completedAt"
+        datePrefix="✓"
+        showProgress={true}
+      />
 
       {/* ── Modals ── */}
       {showGoalModal && (
