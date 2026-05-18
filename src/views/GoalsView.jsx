@@ -1420,7 +1420,7 @@ export default function GoalsView({
           <div style={{ padding: '12px 16px', marginBottom: 14, borderRadius: 10, background: 'rgba(124,106,255,0.07)', border: '1px solid rgba(124,106,255,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#7c6aff' }}>
-                {isMonday ? '📅 It's Monday — time to commit' : '📅 No weekly commitments set yet'}
+                {isMonday ? "📅 It's Monday — time to commit" : "📅 No weekly commitments set yet"}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>What will you move forward on each goal this week?</div>
             </div>

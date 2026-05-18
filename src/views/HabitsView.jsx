@@ -635,7 +635,7 @@ function HabitCard({ habit, logs, today, toggleHabitLog, onEdit, onArchive, onDe
             {isDone ? '✓' : ''}
           </button>
           <span style={{ fontSize: 24, flexShrink: 0, marginTop: 2 }}>{habit.icon}</span>
-          <div style={{ flex: 1, minWidth: 0, minWidth: 120 }}>
+          <div style={{ flex: 1, minWidth: 120 }}>
             <div style={{ fontWeight: 600, fontSize: 15, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? 'var(--text3)' : 'var(--text)', wordBreak: 'break-word' }}>{habit.name}</div>
             {habit.description && <div style={{ fontSize: 12, color: 'var(--text3)', wordBreak: 'break-word', lineHeight: 1.4 }}>{habit.description}</div>}
             <div style={{ fontSize: 11, marginTop: 2 }}>
