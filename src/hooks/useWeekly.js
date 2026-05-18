@@ -3,6 +3,8 @@ import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, order
 import { db } from '../lib/firebase'
 import { getWeekStart } from '../lib/utils'
 
+const DEEP_WORK_TARGET = 28   // must match WeeklyView constant
+
 export function useWeekly() {
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
@@ -25,7 +27,7 @@ export function useWeekly() {
 
   async function savePlan(planData) {
     const weekStart = getWeekStart()
-    const existing = plans.find(p => p.weekStart === weekStart)
+    const existing  = plans.find(p => p.weekStart === weekStart)
     if (existing) {
       await updateDoc(doc(db, 'lo_weekly_plans', existing.id), { ...planData, weekStart, updatedAt: new Date().toISOString() })
     } else {
@@ -45,7 +47,6 @@ export function useWeekly() {
     await deleteDoc(doc(db, 'lo_weekly_plans', id))
   }
 
-  // Save a plan for any arbitrary week (used when filling in past weeks from history)
   async function savePlanForWeek(weekStart, planData) {
     const existing = plans.find(p => p.weekStart === weekStart)
     if (existing) {
@@ -55,17 +56,26 @@ export function useWeekly() {
     }
   }
 
+  // ── Score: goals 65% + rituals 20% + deep work 15% ──────────────────────────
   function getWeekScore() {
     const plan = getCurrentPlan()
     if (!plan) return 0
     const goals = plan.goals || []
     if (!goals.length) return 0
-    const done = goals.filter(g => g.done).length
-    const executionScore = Math.round((done / goals.length) * 100)
-    const sundayDone = plan.sundayReviewDone ?? plan.sundayPlanDone ?? false
-    const mondayDone = plan.mondayPlanDone   ?? plan.fridayReviewDone ?? false
-    const reviewBonus = (sundayDone ? 10 : 0) + (mondayDone ? 10 : 0)
-    return Math.min(100, Math.round(executionScore * 0.8 + reviewBonus))
+
+    const done          = goals.filter(g => g.done).length
+    const goalsPct      = done / goals.length
+    const executionScore = Math.round(goalsPct * 65)
+
+    const sundayDone  = plan.sundayReviewDone ?? plan.sundayPlanDone ?? false
+    const mondayDone  = plan.mondayPlanDone   ?? plan.fridayReviewDone ?? false
+    const ritualBonus = (sundayDone ? 10 : 0) + (mondayDone ? 10 : 0)
+
+    const dwHours = plan.deepWorkHours || 0
+    const dwScore = Math.min(100, Math.round((dwHours / DEEP_WORK_TARGET) * 100))
+    const dwBonus = Math.round(dwScore * 0.15)
+
+    return Math.min(100, executionScore + ritualBonus + dwBonus)
   }
 
   return { plans, loading, getCurrentPlan, savePlan, savePlanForWeek, updatePlan, deletePlan, getWeekScore }
