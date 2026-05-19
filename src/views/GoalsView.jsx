@@ -821,6 +821,27 @@ function GoalCard({
                   ⚠️ {stagnationDays}d no activity
                 </span>
               )}
+              {(() => {
+                // Next pending milestone with a dueDate
+                const nextM = (goal.milestones || [])
+                  .filter(m => !m.done && m.dueDate)
+                  .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0]
+                if (!nextM) return null
+                const days = getCountdown(nextM.dueDate)
+                if (days === null) return null
+                // Only show if overdue OR within 5 days
+                if (days > 5) return null
+                const isOverdue = days < 0
+                const isToday   = days === 0
+                const color  = isOverdue || isToday ? '#ef4444' : days <= 2 ? '#f97316' : '#f59e0b'
+                const bg     = isOverdue || isToday ? 'rgba(239,68,68,0.1)' : days <= 2 ? 'rgba(249,115,22,0.1)' : 'rgba(245,158,11,0.1)'
+                const label  = isOverdue ? `🚨 ${Math.abs(days)}d overdue` : isToday ? '🚨 due today' : `🚨 ${days}d left`
+                return (
+                  <span style={{ fontSize: 10, fontWeight: 800, color, padding: '2px 8px', borderRadius: 20, background: bg }}>
+                    {label}
+                  </span>
+                )
+              })()}
             </div>
 
             {/* Title */}
@@ -1441,107 +1462,6 @@ export default function GoalsView({
               {overdue.length > 0 && <div>🔴 <strong>{overdue.map(g=>g.title).join(', ')}</strong> — overdue. Recommit or reset.</div>}
               {critical.length > 0 && <div>🟠 <strong>{critical.map(g=>g.title).join(', ')}</strong> — {getCountdown(critical[0]?.targetDate) === 0 ? 'due TODAY' : `${getCountdown(critical[0]?.targetDate)}d left`}. Drop everything else.</div>}
             </div>
-          </div>
-        )
-      })()}
-
-      {/* ── Next milestone countdown alert ── */}
-      {(() => {
-        // Collect next pending milestone per active goal that has a dueDate
-        const upcoming = activeGoals
-          .map(goal => {
-            const pending = (goal.milestones || [])
-              .filter(m => !m.done && m.dueDate)
-              .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-            if (!pending.length) return null
-            const m = pending[0]
-            const days = getCountdown(m.dueDate)
-            return { goalId: goal.id, goalTitle: goal.title, milestoneText: m.text, dueDate: m.dueDate, days }
-          })
-          .filter(Boolean)
-          .sort((a, b) => a.days - b.days)
-
-        if (!upcoming.length) return null
-
-        // Bucket into overdue / today / this week / later
-        const overdueMiles  = upcoming.filter(u => u.days < 0)
-        const todayMiles    = upcoming.filter(u => u.days === 0)
-        const urgentMiles   = upcoming.filter(u => u.days > 0 && u.days <= 7)
-        const soonMiles     = upcoming.filter(u => u.days > 7 && u.days <= 14)
-
-        const hasUrgent = overdueMiles.length > 0 || todayMiles.length > 0
-        const borderColor = hasUrgent ? 'rgba(239,68,68,0.35)' : urgentMiles.length > 0 ? 'rgba(245,158,11,0.35)' : 'rgba(124,106,255,0.25)'
-        const bgColor     = hasUrgent ? 'rgba(239,68,68,0.05)' : urgentMiles.length > 0 ? 'rgba(245,158,11,0.05)' : 'rgba(124,106,255,0.05)'
-        const titleColor  = hasUrgent ? '#ef4444' : urgentMiles.length > 0 ? '#f59e0b' : 'var(--accent2)'
-        const titleIcon   = hasUrgent ? '🚨' : urgentMiles.length > 0 ? '⏳' : '📌'
-
-        function dayLabel(days) {
-          if (days < 0) return `${Math.abs(days)}d overdue`
-          if (days === 0) return 'due TODAY'
-          if (days === 1) return '1 day left'
-          if (days < 7)  return `${days} days left`
-          return `${Math.ceil(days / 7)}w ${days % 7}d left`
-        }
-
-        function rowColor(days) {
-          if (days < 0)  return '#ef4444'
-          if (days === 0) return '#ef4444'
-          if (days <= 3) return '#f97316'
-          if (days <= 7) return '#f59e0b'
-          return 'var(--text3)'
-        }
-
-        const displayRows = [...overdueMiles, ...todayMiles, ...urgentMiles, ...soonMiles].slice(0, 6)
-
-        return (
-          <div style={{ padding: '14px 16px', marginBottom: 14, borderRadius: 10, background: bgColor, border: `1px solid ${borderColor}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: titleColor }}>
-                {titleIcon} Next milestone deadlines
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text3)' }}>
-                {upcoming.length} milestone{upcoming.length !== 1 ? 's' : ''} tracked across {activeGoals.filter(g => (g.milestones||[]).some(m=>!m.done&&m.dueDate)).length} goal{activeGoals.filter(g=>(g.milestones||[]).some(m=>!m.done&&m.dueDate)).length !== 1 ? 's' : ''}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              {displayRows.map((u, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {/* Countdown badge */}
-                  <div style={{
-                    flexShrink: 0, minWidth: 90, padding: '3px 10px', borderRadius: 20,
-                    background: u.days < 0 ? 'rgba(239,68,68,0.12)' : u.days === 0 ? 'rgba(239,68,68,0.12)' : u.days <= 3 ? 'rgba(249,115,22,0.1)' : u.days <= 7 ? 'rgba(245,158,11,0.1)' : 'var(--bg3)',
-                    border: `1px solid ${rowColor(u.days)}30`,
-                    textAlign: 'center',
-                  }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: rowColor(u.days) }}>
-                      {dayLabel(u.days)}
-                    </span>
-                  </div>
-
-                  {/* Milestone info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {u.milestoneText}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>
-                      → {u.goalTitle}
-                    </div>
-                  </div>
-
-                  {/* Due date */}
-                  <div style={{ flexShrink: 0, fontSize: 11, color: 'var(--text3)' }}>
-                    {new Date(u.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {upcoming.length > 6 && (
-              <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text3)', textAlign: 'center' }}>
-                +{upcoming.length - 6} more milestones further out
-              </div>
-            )}
           </div>
         )
       })()}
