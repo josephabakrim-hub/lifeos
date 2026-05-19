@@ -56,7 +56,7 @@ export function useWeeklyHistory({ habitsData, weeklyData, fitnessData, mentalDa
           const reviewBonus = (sundayDone ? 10 : 0) + (mondayDone ? 10 : 0)
           const dwHours2 = plan.deepWorkHours || 0
           const dwScore2 = Math.min(100, Math.round((dwHours2 / 28) * 100))
-          weeklyScore = Math.min(100, Math.round((done / goals.length) * 65 + reviewBonus + dwScore2 * 0.15))
+          weeklyScore = Math.min(100, Math.round((done / goals.length) * 50 + reviewBonus + dwScore2 * 0.25))
         }
       }
 

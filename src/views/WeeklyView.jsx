@@ -41,7 +41,7 @@ function get12WYInfo(quarterStartStr) {
   const daysLeft       = 84 - diffDays
   const weeksLeft      = Math.ceil(daysLeft / 7)
   const pct            = Math.round((diffDays / 84) * 100)
-  const isEndgame      = currentWeekNum >= 10
+  const isEndgame      = currentWeekNum >= 8
 
   return { currentWeekNum, daysIntoWeek, daysLeft, weeksLeft, pct, isEndgame, quarterStart: quarterStartStr }
 }
@@ -242,7 +242,7 @@ function WeeklyCalendar({ plans, allPlans, savePlanForWeek, deletePlan }) {
     const bonus     = (sunDone ? 10 : 0) + (monDone ? 10 : 0)
     const dwHours   = plan.deepWorkHours || 0
     const dwScore   = Math.min(100, Math.round((dwHours / DEEP_WORK_TARGET) * 100))
-    return Math.min(100, Math.round(exec * 0.65 + bonus + dwScore * 0.15))
+    return Math.min(100, Math.round(exec * 0.50 + bonus + dwScore * 0.25))
   }
 
   return (
@@ -437,7 +437,12 @@ function QuarterSetupModal({ onSave, onClose }) {
           <input type="date" value={dateInput} onChange={e => { setDateInput(e.target.value); setError('') }} style={{ fontSize: 14 }} />
           {error && <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>{error}</div>}
         </div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+          <button
+            className="btn btn-sm"
+            onClick={() => setDateInput('2026-03-30')}
+            style={{ fontWeight: 700, borderColor: 'var(--accent)', color: 'var(--accent2)' }}
+          >⭐ Q2 2026 — Mar 30</button>
           <button className="btn btn-sm" onClick={() => setDateInput(thisMonday)}>This Monday</button>
           <button className="btn btn-sm" onClick={() => {
             const d = new Date(today); d.setDate(d.getDate() - 28)
@@ -481,8 +486,10 @@ function QuarterBar({ qInfo, onSetup }) {
     ? 'linear-gradient(90deg, var(--accent), #c084fc)'
     : 'linear-gradient(90deg, #22c55e, var(--accent))'
 
-  const urgencyMsg = isEndgame
-    ? `⚠️ Final stretch — ${weeksLeft} week${weeksLeft !== 1 ? 's' : ''} left. No wasted days.`
+  const urgencyMsg = currentWeekNum >= 10
+    ? `🚨 Final ${weeksLeft} week${weeksLeft !== 1 ? 's' : ''}. Every day is a decision point — no wasted days.`
+    : currentWeekNum >= 8
+    ? `⚠️ Week ${currentWeekNum} of 12 — ${weeksLeft} weeks left. Time to close out your quarter goals.`
     : weeksLeft <= 4
     ? `🔥 ${weeksLeft} weeks left — time to accelerate.`
     : `✅ On track — ${weeksLeft} weeks remaining in the sprint.`
@@ -753,7 +760,7 @@ export default function WeeklyView({ plans, loading, getCurrentPlan, savePlan, s
   const ritualBonus    = (sundayReviewDone ? 10 : 0) + (mondayPlanDone ? 10 : 0)
   const dwScore        = Math.min(100, Math.round((deepWorkVal / DEEP_WORK_TARGET) * 100))
   // Updated score formula: goals 65% + rituals 20% + deep work 15%
-  const executionPct   = Math.min(100, Math.round(goalsPct * 65 + ritualBonus + dwScore * 0.15))
+  const executionPct   = Math.min(100, Math.round(goalsPct * 50 + ritualBonus + dwScore * 0.25))
 
   const todayDayKey    = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()]
   const dayOfWeek      = getDayOfWeek()
@@ -955,13 +962,13 @@ export default function WeeklyView({ plans, loading, getCurrentPlan, savePlan, s
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--text3)' }}>
             {/* Goals */}
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Goals completed (65%)</span>
-              <span style={{ color: 'var(--text2)', fontWeight: 600 }}>{Math.round(goalsPct * 65)}pts</span>
+              <span>Goals completed (50%)</span>
+              <span style={{ color: 'var(--text2)', fontWeight: 600 }}>{Math.round(goalsPct * 50)}pts</span>
             </div>
             {/* Deep work */}
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>⚡ Deep work — {deepWorkVal.toFixed(1)}h/{DEEP_WORK_TARGET}h (15%)</span>
-              <span style={{ color: deepWorkPct >= 100 ? 'var(--green)' : deepWorkPct > 0 ? 'var(--amber)' : 'var(--text3)', fontWeight: 600 }}>{Math.round(dwScore * 0.15)}pts</span>
+              <span>⚡ Deep work — {deepWorkVal.toFixed(1)}h/{DEEP_WORK_TARGET}h (25%)</span>
+              <span style={{ color: deepWorkPct >= 100 ? 'var(--green)' : deepWorkPct > 0 ? 'var(--amber)' : 'var(--text3)', fontWeight: 600 }}>{Math.round(dwScore * 0.25)}pts</span>
             </div>
             {/* Rituals */}
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -989,6 +996,158 @@ export default function WeeklyView({ plans, loading, getCurrentPlan, savePlan, s
           </div>
         </div>
       </div>
+
+      {/* ── 12WY Weekly Score Tracker ── */}
+      {(() => {
+        // Build per-week score data from plans history + current live state
+        const qs = quarterStart
+        if (!qs) return null
+
+        const qStart = new Date(qs + 'T00:00:00')
+        const today  = new Date(); today.setHours(0,0,0,0)
+        const totalQDays = Math.floor((today - qStart) / 86400000)
+        if (totalQDays < 0) return null
+
+        const weeksElapsed = Math.min(12, Math.floor(totalQDays / 7) + 1)
+
+        // Score each week
+        function scoreForPlan(plan, isCurrentWeek, liveGoalsPct, liveDwVal, liveRituals) {
+          if (isCurrentWeek) {
+            const gPct  = liveGoalsPct
+            const dw    = Math.min(100, Math.round((liveDwVal / DEEP_WORK_TARGET) * 100))
+            return Math.min(100, Math.round(gPct * 50 + liveRituals + dw * 0.25))
+          }
+          if (!plan) return null
+          const goals = plan.goals || []
+          if (!goals.length) return null
+          const done     = goals.filter(g => g.done).length
+          const gPct     = done / goals.length
+          const sunDone  = plan.sundayReviewDone ?? plan.sundayPlanDone ?? false
+          const monDone  = plan.mondayPlanDone   ?? plan.fridayReviewDone ?? false
+          const bonus    = (sunDone ? 10 : 0) + (monDone ? 10 : 0)
+          const dwHours  = plan.deepWorkHours || 0
+          const dw       = Math.min(100, Math.round((dwHours / DEEP_WORK_TARGET) * 100))
+          return Math.min(100, Math.round(gPct * 50 + bonus + dw * 0.25))
+        }
+
+        const weekRows = []
+        for (let w = 0; w < weeksElapsed; w++) {
+          const wStart = new Date(qStart)
+          wStart.setDate(wStart.getDate() + w * 7)
+          const wStartStr = wStart.toISOString().split('T')[0]
+          const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate() + 6)
+          const wEndStr = wEnd.toISOString().split('T')[0]
+          const isCurrent = wStartStr === getWeekStart()
+          const plan = plans.find(p => p.weekStart === wStartStr)
+          const score = scoreForPlan(
+            plan, isCurrent,
+            goalsPct, deepWorkVal, ritualBonus
+          )
+          weekRows.push({ weekNum: w + 1, wStartStr, isCurrent, score, wEndStr })
+        }
+
+        const TARGET = 85
+        const hitCount  = weekRows.filter(r => r.score !== null && r.score >= TARGET).length
+        const missCount = weekRows.filter(r => r.score !== null && r.score < TARGET).length
+        const avgScore  = weekRows.filter(r => r.score !== null).length
+          ? Math.round(weekRows.filter(r => r.score !== null).reduce((s, r) => s + r.score, 0) / weekRows.filter(r => r.score !== null).length)
+          : null
+
+        return (
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+              <div>
+                <div className="card-title" style={{ margin: 0 }}>📆 12WY — Weekly execution scores</div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>
+                  Brian Moran target: <strong style={{ color: 'var(--amber)' }}>85%/week</strong> · current week updates live
+                </div>
+              </div>
+              {avgScore !== null && (
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text3)' }}>Quarter avg</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, color: avgScore >= 85 ? 'var(--green)' : avgScore >= 65 ? 'var(--amber)' : 'var(--red)' }}>
+                    {avgScore}%
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Week rows */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {weekRows.map(({ weekNum, wStartStr, wEndStr, isCurrent, score }) => {
+                const noData  = score === null
+                const hit     = !noData && score >= TARGET
+                const barPct  = noData ? 0 : score
+                const barColor = noData ? 'var(--bg3)' : hit ? 'var(--green)' : score >= 65 ? 'var(--amber)' : 'var(--red)'
+                const labelDate = new Date(wStartStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+                return (
+                  <div key={weekNum} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {/* Week label */}
+                    <div style={{
+                      fontSize: 11, fontWeight: isCurrent ? 800 : 600,
+                      color: isCurrent ? 'var(--accent2)' : 'var(--text3)',
+                      width: 26, flexShrink: 0, textAlign: 'right',
+                    }}>W{weekNum}</div>
+
+                    {/* Date */}
+                    <div style={{ fontSize: 10, color: 'var(--text3)', width: 50, flexShrink: 0 }}>{labelDate}</div>
+
+                    {/* Bar */}
+                    <div style={{ flex: 1, position: 'relative', height: 18, background: 'var(--bg3)', borderRadius: 4, overflow: 'hidden', border: isCurrent ? '1px solid rgba(124,106,255,0.3)' : '1px solid transparent' }}>
+                      {/* 85% target line */}
+                      <div style={{ position: 'absolute', left: '85%', top: 0, bottom: 0, width: 1, background: 'rgba(245,158,11,0.5)', zIndex: 2 }} />
+                      {/* Fill */}
+                      {!noData && (
+                        <div style={{
+                          position: 'absolute', left: 0, top: 0, bottom: 0,
+                          width: `${barPct}%`, background: barColor,
+                          borderRadius: 4, transition: 'width 0.4s ease',
+                          opacity: isCurrent ? 1 : 0.75,
+                        }} />
+                      )}
+                      {/* "NOW" pulse for current week */}
+                      {isCurrent && (
+                        <div style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', fontSize: 9, color: '#fff', fontWeight: 800, zIndex: 3, opacity: 0.9 }}>LIVE</div>
+                      )}
+                    </div>
+
+                    {/* Score */}
+                    <div style={{
+                      fontSize: 12, fontWeight: 800, width: 36, textAlign: 'right', flexShrink: 0,
+                      color: noData ? 'var(--text3)' : hit ? 'var(--green)' : score >= 65 ? 'var(--amber)' : 'var(--red)',
+                    }}>
+                      {noData ? (isCurrent ? '—' : '—') : `${score}%`}
+                    </div>
+
+                    {/* Hit/miss badge */}
+                    <div style={{ width: 16, flexShrink: 0, textAlign: 'center', fontSize: 11 }}>
+                      {!noData && (hit ? '✓' : '✕')}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Summary footer */}
+            {weekRows.some(r => r.score !== null) && (
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 12 }}>
+                  <span style={{ color: 'var(--green)', fontWeight: 700 }}>✓ {hitCount}</span>
+                  <span style={{ color: 'var(--text3)' }}> weeks ≥85%</span>
+                </div>
+                <div style={{ fontSize: 12 }}>
+                  <span style={{ color: 'var(--red)', fontWeight: 700 }}>✕ {missCount}</span>
+                  <span style={{ color: 'var(--text3)' }}> weeks below target</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text3)', marginLeft: 'auto' }}>
+                  Target: <span style={{ color: 'var(--amber)', fontWeight: 700 }}>85%</span> every week
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* ── Goals this week ── */}
       <div className="card" style={{ marginBottom: 16 }}>

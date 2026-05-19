@@ -65,7 +65,7 @@ export function useWeekly() {
 
     const done          = goals.filter(g => g.done).length
     const goalsPct      = done / goals.length
-    const executionScore = Math.round(goalsPct * 65)
+    const executionScore = Math.round(goalsPct * 50)
 
     const sundayDone  = plan.sundayReviewDone ?? plan.sundayPlanDone ?? false
     const mondayDone  = plan.mondayPlanDone   ?? plan.fridayReviewDone ?? false
@@ -73,7 +73,7 @@ export function useWeekly() {
 
     const dwHours = plan.deepWorkHours || 0
     const dwScore = Math.min(100, Math.round((dwHours / DEEP_WORK_TARGET) * 100))
-    const dwBonus = Math.round(dwScore * 0.15)
+    const dwBonus = Math.round(dwScore * 0.25)
 
     return Math.min(100, executionScore + ritualBonus + dwBonus)
   }
