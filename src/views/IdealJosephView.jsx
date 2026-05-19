@@ -214,8 +214,8 @@ function WeeklyBarChart({ weeklyHistory = [], idealScore, weeksCount }) {
 function ProgressCurveChart({ weeklyHistory = [], pillarScores, idealScore }) {
   const [timeframe, setTimeframe] = useState('weekly')
   const [hoveredIdx, setHoveredIdx] = useState(null)
-  const [chartView, setChartView] = useState('curve') // 'curve' | 'bars'
-  const [weeksCount, setWeeksCount] = useState(12)    // 6, 12, or 30
+  const [chartView, setChartView] = useState('bars')  // 'curve' | 'bars'
+  const [weeksCount, setWeeksCount] = useState(6)     // 6, 12, or 30
 
   // ── Build daily data from weeklyHistory pillar breakdowns ────────────────
   // We approximate daily by interpolating between weekly data points
