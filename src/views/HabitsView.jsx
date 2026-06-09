@@ -714,8 +714,8 @@ function StatRow({ s, onEdit, onArchive, onUnarchive, onDelete }) {
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="btn btn-sm" onClick={onEdit}>✏️</button>
-            {isArchived
-              ? <button className="btn btn-sm" style={{ color: 'var(--green)', borderColor: 'var(--green)' }} onClick={onUnarchive}>♻️</button>
+            {isArchived || habit.mastered
+              ? <button className="btn btn-sm" style={{ color: 'var(--green)', borderColor: 'var(--green)' }} onClick={onUnarchive} title="Restore to active Today view">♻️ Restore</button>
               : <button className="btn btn-sm" style={{ color: 'var(--amber)', borderColor: 'var(--amber)' }} onClick={onArchive}>📦</button>
             }
             <button className="btn btn-sm btn-danger" onClick={() => setConfirmDelete(true)}>✕</button>
@@ -849,7 +849,7 @@ function HistoryTab({ habits, logs, updateHabit, deleteHabit, onEditHabit, toggl
             <StatRow key={s.habit.id} s={s}
               onEdit={() => onEditHabit(s.habit)}
               onArchive={() => updateHabit(s.habit.id, { active: false })}
-              onUnarchive={() => updateHabit(s.habit.id, { active: true, mastered: false })}
+              onUnarchive={() => updateHabit(s.habit.id, { active: true, mastered: s.habit.mastered ? true : false })}
               onDelete={() => deleteHabit(s.habit.id)}
             />
           ))}
