@@ -500,7 +500,7 @@ function DeleteConfirmModal({ habit, onConfirm, onCancel }) {
 function RetroLogModal({ dateStr, habits, logs, toggleHabitLog, onClose }) {
   const today        = formatDate()
   const isFuture     = dateStr > today
-  const activeHabits = habits.filter(h => h.active && !h.mastered && isHabitScheduledOn(h, dateStr))
+  const activeHabits = habits.filter(h => h.active && isHabitScheduledOn(h, dateStr))
   const friendlyDate = new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
   function isDone(habitId) { return !!logs.find(l => l.habitId === habitId && l.date === dateStr && l.done) }
@@ -593,7 +593,7 @@ function HabitHeatmap({ habit, logs, rangeDays }) {
 
 // ─── Habit card ───────────────────────────────────────────────────────────────
 
-function HabitCard({ habit, logs, today, toggleHabitLog, onEdit, onArchive, onDelete, onMastered }) {
+function HabitCard({ habit, logs, today, toggleHabitLog, onEdit, onArchive, onDelete, onMastered, isMastered }) {
   const [rangeDays, setRangeDays] = useState(30)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const isDone           = !!logs.find(l => l.habitId === habit.id && l.date === today && l.done)
@@ -622,13 +622,22 @@ function HabitCard({ habit, logs, today, toggleHabitLog, onEdit, onArchive, onDe
     if (stageInfo.mastered && habit.active && !habit.mastered) onMastered(habit)
   }, [stageInfo.mastered])
 
+  const masteredBorder = isMastered
+    ? { borderLeft: '3px solid #a855f7', background: 'linear-gradient(135deg, rgba(168,85,247,0.04) 0%, transparent 60%)' }
+    : { borderLeft: `3px solid ${habit.color || 'var(--accent)'}` }
+
   return (
     <>
-      <div className="card" style={{ borderLeft: `3px solid ${habit.color || 'var(--accent)'}`, opacity: isScheduledToday ? 1 : 0.55 }}>
+      <div className="card" style={{ ...masteredBorder, opacity: isScheduledToday ? 1 : 0.55, position: 'relative', overflow: 'hidden' }}>
+        {isMastered && (
+          <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 11, fontWeight: 700, color: '#a855f7', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: 20, padding: '2px 8px', letterSpacing: 0.3 }}>
+            ✦ Mastered
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
           <button
             className={`habit-toggle ${isDone ? 'done' : ''}`}
-            style={{ borderColor: isDone ? habit.color : 'var(--border2)', background: isDone ? habit.color : 'transparent', cursor: isScheduledToday ? 'pointer' : 'not-allowed', flexShrink: 0, marginTop: 2 }}
+            style={{ borderColor: isDone ? (isMastered ? '#a855f7' : habit.color) : 'var(--border2)', background: isDone ? (isMastered ? '#a855f7' : habit.color) : 'transparent', cursor: isScheduledToday ? 'pointer' : 'not-allowed', flexShrink: 0, marginTop: 2 }}
             onClick={() => isScheduledToday && toggleHabitLog(habit.id)}
             title={isScheduledToday ? undefined : `Not scheduled today — ${scheduleLabel(scheduledDays, habit)}`}
           >
@@ -636,14 +645,14 @@ function HabitCard({ habit, logs, today, toggleHabitLog, onEdit, onArchive, onDe
           </button>
           <span style={{ fontSize: 24, flexShrink: 0, marginTop: 2 }}>{habit.icon}</span>
           <div style={{ flex: 1, minWidth: 120 }}>
-            <div style={{ fontWeight: 600, fontSize: 15, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? 'var(--text3)' : 'var(--text)', wordBreak: 'break-word' }}>{habit.name}</div>
+            <div style={{ fontWeight: 600, fontSize: 15, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? 'var(--text3)' : isMastered ? '#d8b4fe' : 'var(--text)', wordBreak: 'break-word' }}>{habit.name}</div>
             {habit.description && <div style={{ fontSize: 12, color: 'var(--text3)', wordBreak: 'break-word', lineHeight: 1.4 }}>{habit.description}</div>}
             <div style={{ fontSize: 11, marginTop: 2 }}>
               <span style={{ color: 'var(--text3)' }}>📅 {scheduleLabel(scheduledDays, habit)}</span>
               {!isScheduledToday && <span style={{ color: 'var(--amber)', fontWeight: 600, marginLeft: 6 }}>· Off today</span>}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, flexWrap: 'wrap', marginRight: isMastered ? 80 : 0 }}>
             {streak > 0 && <span className="streak">🔥 {streak}d</span>}
             <span className="badge badge-blue">{rate30}% / 30d</span>
             <button className="btn btn-sm" onClick={onEdit}>✏️</button>
@@ -664,7 +673,7 @@ function HabitCard({ habit, logs, today, toggleHabitLog, onEdit, onArchive, onDe
         {/* Heatmap */}
         <div style={{ marginTop: 10, display: 'flex', gap: 4 }}>
           {HEATMAP_RANGES.map(r => (
-            <button key={r.label} onClick={() => setRangeDays(r.days)} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${rangeDays === r.days ? 'var(--accent)' : 'var(--border)'}`, background: rangeDays === r.days ? 'var(--accent-glow)' : 'transparent', color: rangeDays === r.days ? 'var(--accent)' : 'var(--text3)' }}>{r.label}</button>
+            <button key={r.label} onClick={() => setRangeDays(r.days)} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${rangeDays === r.days ? (isMastered ? '#a855f7' : 'var(--accent)') : 'var(--border)'}`, background: rangeDays === r.days ? (isMastered ? 'rgba(168,85,247,0.1)' : 'var(--accent-glow)') : 'transparent', color: rangeDays === r.days ? (isMastered ? '#a855f7' : 'var(--accent)') : 'var(--text3)' }}>{r.label}</button>
           ))}
         </div>
         <HabitHeatmap habit={habit} logs={logs} rangeDays={rangeDays} />
@@ -737,7 +746,7 @@ function HabitsCalendar({ logs, habits, toggleHabitLog }) {
   const firstDay     = new Date(year, month, 1).getDay()
   const daysInMonth  = new Date(year, month + 1, 0).getDate()
   const blanks       = firstDay === 0 ? 6 : firstDay - 1
-  const activeHabits = habits.filter(h => h.active && !h.mastered)
+  const activeHabits = habits.filter(h => h.active)
 
   const byDay = useMemo(() => {
     const map = {}
@@ -905,8 +914,9 @@ export default function HabitsView({ habits, logs, loading, addHabit, updateHabi
 
   const today        = formatDate()
   const todayScore   = getTodayScore()
-  const activeHabits = habits.filter(h => h.active && !h.mastered)
-  const todayHabits  = activeHabits.filter(h => isHabitScheduledOn(h, today))
+  const activeHabits = habits.filter(h => h.active)
+  const todayHabits  = activeHabits.filter(h => !h.mastered && isHabitScheduledOn(h, today))
+  const masteredTodayHabits = activeHabits.filter(h => h.mastered && isHabitScheduledOn(h, today))
   const offHabits    = activeHabits.filter(h => !isHabitScheduledOn(h, today))
   const doneTodayCount = todayHabits.filter(h => logs.find(l => l.habitId === h.id && l.date === today && l.done)).length
 
@@ -917,7 +927,7 @@ export default function HabitsView({ habits, logs, loading, addHabit, updateHabi
   }
 
   function handleMastered(habit) {
-    updateHabit(habit.id, { active: false, mastered: true, masteredAt: formatDate() })
+    updateHabit(habit.id, { active: true, mastered: true, masteredAt: formatDate() })
     setMasteredHabit(habit)
   }
 
@@ -967,7 +977,7 @@ export default function HabitsView({ habits, logs, loading, addHabit, updateHabi
             </div>
           </div>
 
-          {todayHabits.length === 0 && offHabits.length === 0 ? (
+          {todayHabits.length === 0 && masteredTodayHabits.length === 0 && offHabits.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">🧠</div>
               <h3>No active habits</h3>
@@ -986,6 +996,25 @@ export default function HabitsView({ habits, logs, loading, addHabit, updateHabi
                       onMastered={handleMastered}
                     />
                   ))}
+                </div>
+              )}
+              {masteredTodayHabits.length > 0 && (
+                <div style={{ marginTop: todayHabits.length > 0 ? 20 : 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>✦ Mastered habits — still tracking</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {masteredTodayHabits.map(habit => (
+                      <HabitCard key={habit.id} habit={habit} logs={logs} today={today}
+                        toggleHabitLog={toggleHabitLog}
+                        onEdit={() => { setEditHabit(habit); setShowModal(true) }}
+                        onArchive={() => updateHabit(habit.id, { active: false })}
+                        onDelete={() => deleteHabit(habit.id)}
+                        onMastered={handleMastered}
+                        isMastered
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
               {offHabits.length > 0 && (
