@@ -91,7 +91,7 @@ export function useHabits() {
   // Score for today — only counts habits scheduled today
   function getTodayScore() {
     const today = formatDate()
-    const activeHabits = habits.filter(h => h.active && !h.mastered)
+    const activeHabits = habits.filter(h => h.active)
     const scheduledToday = activeHabits.filter(h => isHabitScheduledOn(h, today))
     if (!scheduledToday.length) return 0
     const done = scheduledToday.filter(h =>
@@ -102,7 +102,7 @@ export function useHabits() {
 
   // Week score — only counts days from Monday of the current week up to today
   function getWeekScore() {
-    const activeHabits = habits.filter(h => h.active && !h.mastered)
+    const activeHabits = habits.filter(h => h.active)
     if (!activeHabits.length) return 0
 
     const weekStart = getWeekStart()
